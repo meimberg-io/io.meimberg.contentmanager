@@ -36,6 +36,8 @@ import {
   ChevronRight,
   FileText,
   PenLine,
+  ImageIcon,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -91,6 +93,12 @@ export default function PostDetailPage() {
   const [showAiSettings, setShowAiSettings] = useState(false);
   const [showMetaFields, setShowMetaFields] = useState(true);
 
+  // Header image generation
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
+  const [headerPictureUrl, setHeaderPictureUrl] = useState<string | undefined>(undefined);
+  const [generatingImage, setGeneratingImage] = useState<"prompt" | "image" | null>(null);
+
   // Editable fields
   const [form, setForm] = useState({
     pagetitle: "",
@@ -132,6 +140,8 @@ export default function PostDetailPage() {
         date: transformed.date,
       });
       setBodyBlocks(transformed.body || []);
+      setHeaderPictureUrl(transformed.headerpicture);
+      setGeneratedImageBase64(null); // Clear any preview on reload
     } catch (error) {
       console.error("Failed to load post:", error);
     } finally {
@@ -165,6 +175,35 @@ export default function PostDetailPage() {
       .catch((err) => console.error("Failed to load AI settings:", err));
   }, []);
 
+  // Auto-generate image prompt when post has source material but no prompt yet
+  useEffect(() => {
+    if (!post || imagePrompt) return;
+    const hasSourceMaterial = post.sourceRaw || post.sourceSummarized;
+    if (!hasSourceMaterial) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/ai/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "prompt",
+            sourceRaw: post.sourceRaw,
+            sourceSummarized: post.sourceSummarized,
+          }),
+        });
+        const data = await res.json();
+        if (!cancelled && res.ok && data.imagePrompt) {
+          setImagePrompt(data.imagePrompt);
+        }
+      } catch {
+        // Silently fail — user can still generate manually
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [post?.storyblokId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ─── Handlers ───────────────────────────────────────────────
 
   const handleSave = async () => {
@@ -172,6 +211,23 @@ export default function PostDetailPage() {
     setSaving(true);
 
     try {
+      // If there's a generated image, upload it first
+      let headerpictureUpdate: any = undefined;
+      if (generatedImageBase64) {
+        const uploadRes = await fetch("/api/ai/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "upload",
+            base64: generatedImageBase64,
+            filename: `header-${post.slug}-${Date.now()}.png`,
+          }),
+        });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploadData.error || "Image upload failed");
+        headerpictureUpdate = { filename: uploadData.assetUrl, alt: form.pagetitle || post.slug };
+      }
+
       const response = await fetch("/api/posts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -179,6 +235,7 @@ export default function PostDetailPage() {
           id: post.storyblokId,
           ...form,
           body: bodyBlocks,
+          ...(headerpictureUpdate ? { headerpicture: headerpictureUpdate } : {}),
         }),
       });
 
@@ -390,6 +447,83 @@ export default function PostDetailPage() {
     }
   };
 
+  // ─── Header Image Generation ────────────────────────────────
+
+  const handleGenerateImagePrompt = async () => {
+    if (!post) return;
+    setGeneratingImage("prompt");
+    try {
+      const response = await fetch("/api/ai/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "prompt",
+          sourceRaw: post.sourceRaw,
+          sourceSummarized: post.sourceSummarized,
+          hint: transientPromptHint || undefined,
+          modelId: transientModel || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to generate prompt");
+      setImagePrompt(data.imagePrompt);
+      toast({ title: "Image prompt generated" });
+    } catch (error: any) {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setGeneratingImage(null);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!post) return;
+    let prompt = imagePrompt.trim();
+
+    // If no prompt yet, auto-generate one first
+    if (!prompt) {
+      setGeneratingImage("prompt");
+      try {
+        const promptRes = await fetch("/api/ai/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "prompt",
+            sourceRaw: post.sourceRaw,
+            sourceSummarized: post.sourceSummarized,
+            hint: transientPromptHint || undefined,
+            modelId: transientModel || undefined,
+          }),
+        });
+        const promptData = await promptRes.json();
+        if (!promptRes.ok) throw new Error(promptData.error || "Failed to generate prompt");
+        prompt = promptData.imagePrompt;
+        setImagePrompt(prompt);
+      } catch (error: any) {
+        toast({ title: "Failed", description: error.message, variant: "destructive" });
+        setGeneratingImage(null);
+        return;
+      }
+    }
+
+    // Now generate the image
+    setGeneratingImage("image");
+    try {
+      const response = await fetch("/api/ai/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "image", dallePrompt: prompt }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Image generation failed");
+      setGeneratedImageBase64(data.base64);
+      toast({ title: "Header image generated", description: "Image will be uploaded when you save." });
+    } catch (error: any) {
+      toast({ title: "Generation failed", description: error.message, variant: "destructive" });
+    } finally {
+      setGeneratingImage(null);
+    }
+  };
+
   // ─── Rendering ──────────────────────────────────────────────
 
   if (loading) {
@@ -458,6 +592,54 @@ export default function PostDetailPage() {
           </Button>
         </div>
 
+        {/* Header Picture */}
+        <div className="animate-fade-in" style={{ animationDelay: "50ms" }}>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-lg font-semibold">Header Picture</h2>
+            {hasSource && (
+              <Button
+                size="sm"
+                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handleGenerateImage}
+                disabled={!!generatingImage}
+              >
+                {generatingImage === "image" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ImageIcon className="h-3.5 w-3.5" />
+                )}
+                Generate Picture
+              </Button>
+            )}
+          </div>
+
+          {/* Image preview */}
+          {(generatedImageBase64 || headerPictureUrl) && (
+            <div className="relative rounded-lg overflow-hidden border border-border/50 mb-3" style={{ aspectRatio: "4/1" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={generatedImageBase64 ? `data:image/png;base64,${generatedImageBase64}` : headerPictureUrl}
+                alt="Header picture"
+                className="w-full h-full object-cover object-center absolute inset-0"
+              />
+              {generatedImageBase64 && (
+                <div className="absolute top-2 right-2">
+                  <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px]">
+                    Unsaved — will upload on save
+                  </Badge>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!generatedImageBase64 && !headerPictureUrl && (
+            <div className="rounded-lg border border-dashed border-border/50 bg-secondary/10 p-8 text-center text-sm text-muted-foreground mb-3">
+              <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              No header picture yet. Generate one using the image prompt in AI Settings.
+            </div>
+          )}
+        </div>
+
         {/* Body Editor */}
         <div className="animate-fade-in" style={{ animationDelay: "100ms" }}>
           {/* Generate Body Button */}
@@ -465,9 +647,8 @@ export default function PostDetailPage() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-display text-lg font-semibold">Body Content</h2>
               <Button
-                variant="outline"
                 size="sm"
-                className="gap-2 text-blue-400 border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-300"
+                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => handleGenerateBody()}
                 disabled={!!generating}
               >
@@ -562,29 +743,39 @@ export default function PostDetailPage() {
             </div>
 
             {post.sourceSummarized && (
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">
-                  Summary
-                </Label>
-                <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-64 overflow-y-auto">
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                    {fixTables(post.sourceSummarized)}
-                  </ReactMarkdown>
-                </div>
-              </div>
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger className="flex items-center gap-1 w-full text-left mb-1">
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
+                  <Label className="text-xs text-muted-foreground cursor-pointer">
+                    Summary
+                  </Label>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-64 overflow-y-auto">
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                      {fixTables(post.sourceSummarized)}
+                    </ReactMarkdown>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             {post.sourceRaw && (
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">
-                  Raw Transcription
-                </Label>
-                <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-48 overflow-y-auto">
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                    {fixTables(post.sourceRaw)}
-                  </ReactMarkdown>
-                </div>
-              </div>
+              <Collapsible>
+                <CollapsibleTrigger className="flex items-center gap-1 w-full text-left mb-1">
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
+                  <Label className="text-xs text-muted-foreground cursor-pointer">
+                    Raw Transcription
+                  </Label>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-48 overflow-y-auto">
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                      {fixTables(post.sourceRaw)}
+                    </ReactMarkdown>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
           </div>
         )}
@@ -701,6 +892,38 @@ export default function PostDetailPage() {
                     rows={2}
                   />
                 </div>
+
+                {/* Image Prompt */}
+                {hasSource && (
+                  <div className="rounded-lg border border-blue-500/20 p-3 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">
+                        Image Prompt (DALL-E)
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-blue-400 hover:text-blue-300"
+                        onClick={handleGenerateImagePrompt}
+                        disabled={!!generatingImage}
+                      >
+                        {generatingImage === "prompt" ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                        )}
+                        {imagePrompt ? "Regenerate" : "Generate"}
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={imagePrompt}
+                      onChange={(e) => setImagePrompt(e.target.value)}
+                      placeholder="Click 'Generate' to create a prompt from the source material, or write your own..."
+                      className="resize-none bg-secondary/50 text-xs focus-visible:ring-blue-500/40 focus-visible:border-blue-500/50"
+                      rows={3}
+                    />
+                  </div>
+                )}
 
                 {/* Main Prompt (read-only) */}
                 {mainPrompt && (

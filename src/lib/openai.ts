@@ -307,6 +307,56 @@ function parseInlineMarks(text: string): any[] {
 }
 
 /**
+ * Generate a DALL-E prompt from source material using AI
+ */
+export async function generateImagePrompt(options: BlogGenerationOptions): Promise<string> {
+  const prompt = options.prompt || DEFAULT_PROMPTS.headerImage
+  const fullPrompt = buildFullPrompt(options.sourceRaw, options.sourceSummarized, prompt!, options.hint)
+  const response = await callAI({ prompt: fullPrompt, modelId: options.modelId })
+  return response.trim().replace(/^["']|["']$/g, '')
+}
+
+/**
+ * Generate a header image using DALL-E 3
+ * Returns the image as a base64-encoded PNG
+ */
+export async function generateHeaderImage(dallePrompt: string): Promise<{ base64: string }> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured')
+  }
+
+  const response = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'dall-e-3',
+      prompt: dallePrompt,
+      n: 1,
+      size: '1792x1024',
+      quality: 'standard',
+      response_format: 'b64_json',
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(`DALL-E API error: ${error.error?.message || response.statusText}`)
+  }
+
+  const data = await response.json()
+  const b64 = data.data?.[0]?.b64_json
+  if (!b64) {
+    throw new Error('DALL-E returned no image data')
+  }
+
+  return { base64: b64 }
+}
+
+/**
  * Generate all content fields from source material
  */
 export async function generateAllFromSource(

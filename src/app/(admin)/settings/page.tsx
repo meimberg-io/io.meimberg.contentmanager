@@ -58,6 +58,18 @@ Anforderungen:
 
 Sprache: Deutsch.
 Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
+  headerImage: `Basierend auf dem folgenden Quellmaterial, erstelle eine prägnante Bildbeschreibung (Prompt) für ein KI-generiertes Header-Bild eines Blogposts.
+
+Anforderungen:
+- Die Beschreibung soll auf Englisch sein (für DALL-E)
+- Beschreibe eine stimmungsvolle, abstrakte oder symbolische Szene, die das Thema visuell einfängt
+- Kein Text im Bild
+- Stil: modern, clean, professionell, leicht editorial
+- Farbpalette: harmonisch, nicht zu bunt
+- Format: Wide banner/header image (landscape orientation)
+- Gib NUR den Bild-Prompt zurück, keine Erklärung
+
+Sprache des Prompts: Englisch.`,
 };
 
 const PROMPT_FIELDS: { key: string; label: string; description: string }[] = [
@@ -68,6 +80,7 @@ const PROMPT_FIELDS: { key: string; label: string; description: string }[] = [
   { key: "readmoretext", label: "Read More Text", description: "Generates the call-to-action text (readmoretext)" },
   { key: "generateAll", label: "Generate All (combined)", description: "Used when generating all meta fields at once. Must produce JSON output." },
   { key: "body", label: "Body Article", description: "Generates the main blog article body content as a richtext block with headings, formatting and links." },
+  { key: "headerImage", label: "Header Image (DALL-E)", description: "Meta-prompt: generates a DALL-E image prompt from the source material. The resulting prompt is then sent to DALL-E to create the header picture." },
 ];
 
 interface AIModel {
