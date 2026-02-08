@@ -1188,14 +1188,14 @@ export default function PostDetailPage() {
 
       {/* Edit Summary Dialog */}
       <Dialog open={editSummaryOpen} onOpenChange={setEditSummaryOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Summary</DialogTitle>
           </DialogHeader>
           <Textarea
             value={editSummaryText}
             onChange={(e) => setEditSummaryText(e.target.value)}
-            className="flex-1 min-h-[400px] font-mono text-sm resize-none"
+            className="flex-1 min-h-[500px] font-mono text-xs resize-none"
           />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditSummaryOpen(false)}>
