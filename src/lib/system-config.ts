@@ -13,15 +13,8 @@ const SYSTEM_STORY_SLUG = 'system'
 let cachedStoryId: number | null = null
 
 export interface SystemConfig {
-  settings?: {
-    aiModel?: string
-    aiPrompts?: {
-      title?: string
-      caption?: string
-      tags?: string
-    }
-    notes?: string
-  }
+  [key: string]: any
+  settings?: any
 }
 
 /**
