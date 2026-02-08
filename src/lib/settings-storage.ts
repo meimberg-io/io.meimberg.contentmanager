@@ -13,6 +13,7 @@ export interface AiPrompts {
   readmoretext?: string
   generateAll?: string
   body?: string
+  headerImage?: string
 }
 
 export interface Settings {
@@ -55,6 +56,18 @@ Anforderungen:
 
 Sprache: Deutsch.
 Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
+  headerImage: `Basierend auf dem folgenden Quellmaterial, erstelle eine prägnante Bildbeschreibung (Prompt) für ein KI-generiertes Header-Bild eines Blogposts.
+
+Anforderungen:
+- Die Beschreibung soll auf Englisch sein (für DALL-E)
+- Beschreibe eine stimmungsvolle, abstrakte oder symbolische Szene, die das Thema visuell einfängt
+- Kein Text im Bild
+- Stil: modern, clean, professionell, leicht editorial
+- Farbpalette: harmonisch, nicht zu bunt
+- Format: Wide banner/header image (landscape orientation)
+- Gib NUR den Bild-Prompt zurück, keine Erklärung
+
+Sprache des Prompts: Englisch.`,
 }
 
 /**
