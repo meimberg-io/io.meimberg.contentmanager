@@ -1,0 +1,37 @@
+---
+alwaysApply: true
+---
+
+# meimberg.io Contentmanager
+
+## Storyblok Rate Limits
+
+Storyblok Management API has rate limits (~5 requests/second).
+
+**When making bulk updates:**
+- Add 200ms delay between requests: `await new Promise(resolve => setTimeout(resolve, 200))`
+- Implement retry with exponential backoff for rate limit errors
+- Check for "Rate limit" in error messages
+
+**Example pattern:**
+```typescript
+let delay = 200
+for (const item of items) {
+  if (index > 0) await new Promise(r => setTimeout(r, delay))
+  try {
+    await updatePost(id, data)
+  } catch (err) {
+    if (err.message?.includes('Rate limit')) {
+      delay *= 2 // exponential backoff
+      // retry...
+    }
+  }
+}
+```
+
+## Blog Content Model
+
+- Blog posts are stored in Storyblok `/blog` folder with `blog` component
+- Content complete requires ALL 9 fields: pagetitle, pageintro, teasertitle, abstract, teaserimage, readmoretext, date, headerpicture, body
+- Publish state uses Storyblok native publish/unpublish (not a custom field)
+- Source material (source_raw, source_summarized) comes from Plaud email import

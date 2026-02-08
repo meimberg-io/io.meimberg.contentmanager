@@ -1,0 +1,25 @@
+# Production docker-compose.yml
+# Used by GitHub Actions deployment workflow
+# Variables are substituted using envsubst during deployment
+
+version: "3.9"
+
+services:
+  ${PROJECT_NAME}:
+    image: ${DOCKER_IMAGE}
+    container_name: ${PROJECT_NAME}
+    restart: unless-stopped
+    env_file: .env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.${PROJECT_NAME}.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.${PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${PROJECT_NAME}.tls.certresolver=le"
+      - "traefik.http.services.${PROJECT_NAME}.loadbalancer.server.port=3000"
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    external: true
