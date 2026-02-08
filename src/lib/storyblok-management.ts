@@ -29,6 +29,8 @@ export interface BlogPostData {
   // Source material
   cm_source_raw?: string
   cm_source_summarized?: string
+  cm_ai_hint?: string
+  cm_image_prompt?: string
   // Status fields
   cm_content_complete?: boolean
   cm_content_confirmed_at?: string

@@ -26,6 +26,9 @@ export interface BlogPost {
   // Source material (from Plaud import via email)
   sourceRaw?: string;         // Original Plaud transcription (raw)
   sourceSummarized?: string;  // Plaud summary
+  // AI settings (persisted per post)
+  aiHint?: string;            // Additional AI hint
+  imagePrompt?: string;       // DALL-E image prompt
   // Status
   status: {
     contentComplete: StatusCheck;
