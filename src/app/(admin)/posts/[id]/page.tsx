@@ -38,7 +38,15 @@ import {
   PenLine,
   ImageIcon,
   RefreshCw,
+  Pencil,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -99,6 +107,10 @@ export default function PostDetailPage() {
   const [headerPictureUrl, setHeaderPictureUrl] = useState<string | undefined>(undefined);
   const [generatingImage, setGeneratingImage] = useState<"prompt" | "image" | null>(null);
 
+  // Source edit dialog
+  const [editSummaryOpen, setEditSummaryOpen] = useState(false);
+  const [editSummaryText, setEditSummaryText] = useState("");
+
   // Editable fields
   const [form, setForm] = useState({
     pagetitle: "",
@@ -142,6 +154,8 @@ export default function PostDetailPage() {
       setBodyBlocks(transformed.body || []);
       setHeaderPictureUrl(transformed.headerpicture);
       setGeneratedImageBase64(null); // Clear any preview on reload
+      if (transformed.aiHint) setTransientPromptHint(transformed.aiHint);
+      if (transformed.imagePrompt) setImagePrompt(transformed.imagePrompt);
     } catch (error) {
       console.error("Failed to load post:", error);
     } finally {
@@ -235,6 +249,8 @@ export default function PostDetailPage() {
           id: post.storyblokId,
           ...form,
           body: bodyBlocks,
+          cm_ai_hint: transientPromptHint || "",
+          cm_image_prompt: imagePrompt || "",
           ...(headerpictureUpdate ? { headerpicture: headerpictureUpdate } : {}),
         }),
       });
@@ -744,14 +760,26 @@ export default function PostDetailPage() {
 
             {post.sourceSummarized && (
               <Collapsible defaultOpen>
-                <CollapsibleTrigger className="flex items-center gap-1 w-full text-left mb-1">
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
-                  <Label className="text-xs text-muted-foreground cursor-pointer">
-                    Summary
-                  </Label>
-                </CollapsibleTrigger>
+                <div className="flex items-center justify-between mb-1">
+                  <CollapsibleTrigger className="flex items-center gap-1 text-left">
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
+                    <Label className="text-xs text-muted-foreground cursor-pointer">
+                      Summary
+                    </Label>
+                  </CollapsibleTrigger>
+                  <button
+                    className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                    onClick={() => {
+                      setEditSummaryText(post.sourceSummarized || "");
+                      setEditSummaryOpen(true);
+                    }}
+                    title="Edit summary"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                </div>
                 <CollapsibleContent>
-                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-64 overflow-y-auto">
+                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-64 overflow-y-auto mt-2">
                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                       {fixTables(post.sourceSummarized)}
                     </ReactMarkdown>
@@ -769,7 +797,7 @@ export default function PostDetailPage() {
                   </Label>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-48 overflow-y-auto">
+                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-48 overflow-y-auto mt-2">
                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                       {fixTables(post.sourceRaw)}
                     </ReactMarkdown>
@@ -887,9 +915,11 @@ export default function PostDetailPage() {
                   <Textarea
                     value={transientPromptHint}
                     onChange={(e) => setTransientPromptHint(e.target.value)}
+                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                     placeholder="E.g. 'Focus on technical details', 'Style: casual'..."
-                    className="resize-none bg-secondary/50 text-xs focus-visible:ring-blue-500/40 focus-visible:border-blue-500/50"
-                    rows={2}
+                    className="resize-none overflow-hidden bg-secondary/50 text-xs focus-visible:ring-blue-500/40 focus-visible:border-blue-500/50"
+                    rows={1}
                   />
                 </div>
 
@@ -918,9 +948,11 @@ export default function PostDetailPage() {
                     <Textarea
                       value={imagePrompt}
                       onChange={(e) => setImagePrompt(e.target.value)}
+                      onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+                      ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                       placeholder="Click 'Generate' to create a prompt from the source material, or write your own..."
-                      className="resize-none bg-secondary/50 text-xs focus-visible:ring-blue-500/40 focus-visible:border-blue-500/50"
-                      rows={3}
+                      className="resize-none overflow-hidden bg-secondary/50 text-xs focus-visible:ring-blue-500/40 focus-visible:border-blue-500/50"
+                      rows={1}
                     />
                   </div>
                 )}
@@ -1007,9 +1039,11 @@ export default function PostDetailPage() {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, pageintro: e.target.value }))
                     }
+                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                     placeholder="Introduction text"
-                    rows={2}
-                    className="text-sm"
+                    rows={1}
+                    className="text-sm resize-none overflow-hidden"
                   />
                 </FieldWithAI>
 
@@ -1042,9 +1076,11 @@ export default function PostDetailPage() {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, abstract: e.target.value }))
                     }
+                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                     placeholder="Short summary / teaser text"
-                    rows={2}
-                    className="text-sm"
+                    rows={1}
+                    className="text-sm resize-none overflow-hidden"
                   />
                 </FieldWithAI>
 
@@ -1149,6 +1185,52 @@ export default function PostDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Summary Dialog */}
+      <Dialog open={editSummaryOpen} onOpenChange={setEditSummaryOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Edit Summary</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={editSummaryText}
+            onChange={(e) => setEditSummaryText(e.target.value)}
+            className="flex-1 min-h-[400px] font-mono text-sm resize-none"
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditSummaryOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!post) return;
+                setSaving(true);
+                try {
+                  await fetch("/api/posts", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      id: post.storyblokId,
+                      cm_source_summarized: editSummaryText,
+                    }),
+                  });
+                  setEditSummaryOpen(false);
+                  toast({ title: "Summary updated" });
+                  await loadPost();
+                } catch (error: any) {
+                  toast({ title: "Failed", description: error.message, variant: "destructive" });
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

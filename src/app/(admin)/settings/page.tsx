@@ -26,9 +26,9 @@ import { toast } from "@/hooks/use-toast";
 // Must match DEFAULT_PROMPTS in settings-storage.ts
 const DEFAULT_PROMPTS: Record<string, string> = {
   pagetitle: `Basierend auf dem Quellmaterial, generiere einen überzeugenden Blog-Titel. Der Titel sollte einprägsam sein und den Kern des Themas erfassen. Maximal 80 Zeichen. Gib NUR den Titel zurück, keine Erklärung. Sprache: Deutsch.`,
-  pageintro: `Basierend auf dem Quellmaterial, schreibe eine Einleitung für den Blogpost. Die Einleitung sollte den Leser ins Thema einführen und Kontext geben. 2-4 Sätze. Gib NUR den Text zurück. Sprache: Deutsch.`,
+  pageintro: `Basierend auf dem Quellmaterial, schreibe eine kurze Einleitung für den Blogpost. 2-3 Sätze. Nüchtern, sachlich, auf den Punkt. Den Leser NICHT direkt ansprechen (kein "du", kein "ihr", kein "Sie"). Keine Übertreibungen, keine Superlative, nichts Werbliches. Keine Formulierungen wie "klingt nach Science-Fiction", "spannender Weg" oder "mehr als man denkt" — das ist zu plakativ. Einfach beschreiben, worum es geht, ruhig und unaufgeregt. Gib NUR den Text zurück. Sprache: Deutsch.`,
   teasertitle: `Basierend auf dem Quellmaterial, generiere einen kurzen Teaser-Titel. Dieser wird als Überschrift in der Vorschau / Teaser-Karte angezeigt. Maximal 60 Zeichen. Gib NUR den Titel zurück. Sprache: Deutsch.`,
-  abstract: `Basierend auf dem Quellmaterial, schreibe eine kurze Zusammenfassung / ein Abstract für den Blogpost. Der Text sollte neugierig machen und zum Weiterlesen anregen. 2-3 Sätze, ca. 150-250 Zeichen. Gib NUR den Text zurück. Sprache: Deutsch.`,
+  abstract: `Basierend auf dem Quellmaterial, schreibe ein kurzes Abstract für den Blogpost. 1-2 Sätze, maximal 120 Zeichen. Sachlich, aber nicht trocken. Subtil eigene Haltung zeigen, ohne aufzutrumpfen. Keine Ausrufezeichen, keine rhetorischen Fragen, keine Wortspiele. Ruhig und klar. Gib NUR den Text zurück. Sprache: Deutsch.`,
   readmoretext: `Basierend auf dem Quellmaterial, generiere einen kurzen "Weiterlesen"-Text. Dieser Text erscheint als Call-to-Action unter dem Teaser. Maximal 50 Zeichen. Gib NUR den Text zurück (z.B. "Mehr über XY erfahren", "Warum XY wichtig ist"). Sprache: Deutsch.`,
   generateAll: `Basierend auf dem Quellmaterial, generiere die folgenden Blog-Felder.
 Antworte im JSON-Format:
@@ -52,7 +52,8 @@ Anforderungen:
 - Verwende Aufzählungen mit Bindestrich (- Punkt 1, - Punkt 2) wo sinnvoll, z.B. für Vorteile, Schritte oder Auflistungen
 - Füge relevante Links ein, wenn im Quellmaterial URLs erwähnt werden, im Format [Linktext](URL)
 - Der Artikel sollte 800-1500 Wörter lang sein
-- Schreibe in einem professionellen aber zugänglichen Stil
+- Schreibe in einem persönlichen, leicht meinungsstarken Ton — so, als würdest du laut für den Leser mitdenken. Nutze rhetorische Fragen, gelegentliche Einschübe in Klammern und bildhafte Redewendungen. Der Stil darf ruhig etwas provokant und nachdenklich sein — nicht zu glatt, nicht zu akademisch.
+- Trau dich, eigene Einordnungen und Meinungen zu formulieren, statt nur neutral zu berichten.
 - Beginne NICHT mit einem Titel oder einer Überschrift der Ebene # (der Seitentitel wird separat generiert)
 - Beginne direkt mit einem einleitenden Absatz, dann folgen die ## Abschnitte
 
@@ -285,9 +286,12 @@ export default function SettingsPage() {
                 </div>
                 <Textarea
                   id={`prompt-${field.key}`}
-                  className="font-mono text-sm bg-secondary/50 min-h-[100px]"
+                  className="font-mono text-sm bg-secondary/50 resize-none overflow-hidden"
                   value={prompts[field.key] || ''}
                   onChange={(e) => setPromptValue(field.key, e.target.value)}
+                  onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+                  ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                  rows={3}
                 />
                 <p className="text-xs text-muted-foreground">{field.description}</p>
               </div>
@@ -381,9 +385,12 @@ export default function SettingsPage() {
             </p>
             <Textarea
               placeholder="Save prompts, ideas, or any text here..."
-              className="font-mono text-sm bg-secondary/50 min-h-[400px] resize-y"
+              className="font-mono text-sm bg-secondary/50 resize-none overflow-hidden"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+              ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+              rows={10}
             />
           </div>
 

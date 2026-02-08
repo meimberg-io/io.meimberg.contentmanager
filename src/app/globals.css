@@ -12,6 +12,10 @@
 @tailwind components;
 @tailwind utilities;
 
+textarea {
+  color: #aaaaaa;
+}
+
 @layer base {
   :root {
     /* meimberg.io Contentmanager Theme - Elegant Dark with Gold Accents */

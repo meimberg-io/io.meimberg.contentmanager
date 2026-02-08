@@ -103,6 +103,8 @@ export interface Blog {
   cm_socialmedia?: boolean;
   cm_publer_published_at?: string;
   cm_publer_post_ids?: string;
+  cm_ai_hint?: string;
+  cm_image_prompt?: string;
   component: "blog";
   _uid: string;
   [k: string]: unknown;
