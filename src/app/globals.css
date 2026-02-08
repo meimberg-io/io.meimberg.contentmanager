@@ -1,0 +1,423 @@
+@import "@fontsource/playfair-display/400.css";
+@import "@fontsource/playfair-display/500.css";
+@import "@fontsource/playfair-display/600.css";
+@import "@fontsource/playfair-display/700.css";
+@import "@fontsource/inter/300.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* meimberg.io Contentmanager Theme - Elegant Dark with Gold Accents */
+    --background: 222 20% 6%;
+    --foreground: 45 20% 95%;
+
+    --card: 222 18% 10%;
+    --card-foreground: 45 20% 95%;
+
+    --popover: 222 18% 12%;
+    --popover-foreground: 45 20% 95%;
+
+    /* Gold primary for luxury feel */
+    --primary: 42 80% 55%;
+    --primary-foreground: 222 20% 6%;
+
+    --secondary: 222 15% 18%;
+    --secondary-foreground: 45 15% 85%;
+
+    --muted: 222 12% 16%;
+    --muted-foreground: 222 10% 55%;
+
+    --accent: 42 60% 45%;
+    --accent-foreground: 45 20% 95%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 45 20% 95%;
+
+    --border: 222 15% 20%;
+    --input: 222 15% 18%;
+    --ring: 42 80% 55%;
+
+    --radius: 0.625rem;
+
+    /* Status colors */
+    --status-green: 142 76% 45%;
+    --status-yellow: 45 93% 55%;
+    --status-red: 0 84% 60%;
+    --status-gray: 222 10% 45%;
+
+    /* Gradient tokens */
+    --gradient-gold: linear-gradient(135deg, hsl(42 80% 55%), hsl(38 85% 45%));
+    --gradient-dark: linear-gradient(180deg, hsl(222 20% 8%) 0%, hsl(222 20% 4%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(222 18% 12%) 0%, hsl(222 18% 8%) 100%);
+    --gradient-stat-blue: linear-gradient(135deg, hsl(220 70% 50%) 0%, hsl(230 70% 40%) 100%);
+    --gradient-stat-yellow: linear-gradient(135deg, hsl(45 90% 55%) 0%, hsl(38 85% 45%) 100%);
+    --gradient-stat-green: linear-gradient(135deg, hsl(142 70% 45%) 0%, hsl(152 70% 35%) 100%);
+    --gradient-stat-purple: linear-gradient(135deg, hsl(280 70% 55%) 0%, hsl(260 70% 45%) 100%);
+
+    /* Shadows */
+    --shadow-card: 0 4px 20px -4px hsl(222 20% 0% / 0.4);
+    --shadow-glow: 0 0 40px -10px hsl(42 80% 55% / 0.3);
+    --shadow-hover: 0 8px 30px -8px hsl(222 20% 0% / 0.5);
+
+    /* Sidebar */
+    --sidebar-background: 222 18% 8%;
+    --sidebar-foreground: 45 15% 85%;
+    --sidebar-primary: 42 80% 55%;
+    --sidebar-primary-foreground: 222 20% 6%;
+    --sidebar-accent: 222 15% 15%;
+    --sidebar-accent-foreground: 45 20% 95%;
+    --sidebar-border: 222 15% 15%;
+    --sidebar-ring: 42 80% 55%;
+  }
+
+  .light {
+    --background: 45 30% 97%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 42 80% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 45 20% 92%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 45 15% 90%;
+    --muted-foreground: 222 15% 40%;
+
+    --accent: 42 60% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 45 15% 85%;
+    --input: 45 15% 85%;
+    --ring: 42 80% 45%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 42 80% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 45 20% 95%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 45 15% 88%;
+    --sidebar-ring: 42 80% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Inter", system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Playfair Display", Georgia, serif;
+  }
+}
+
+@layer components {
+  .stat-card {
+    @apply relative overflow-hidden rounded-xl p-6 transition-all duration-300;
+    box-shadow: var(--shadow-card);
+  }
+
+  .stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .stat-card-blue {
+    background: var(--gradient-stat-blue);
+  }
+
+  .stat-card-yellow {
+    background: var(--gradient-stat-yellow);
+  }
+
+  .stat-card-green {
+    background: var(--gradient-stat-green);
+  }
+
+  .stat-card-purple {
+    background: var(--gradient-stat-purple);
+  }
+
+  .glass-card {
+    @apply rounded-xl border border-border/50 p-6;
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .gold-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .status-icon {
+    @apply inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-semibold;
+  }
+
+  .status-green {
+    @apply bg-[hsl(var(--status-green))] text-white;
+  }
+
+  .status-yellow {
+    @apply bg-[hsl(var(--status-yellow))] text-black;
+  }
+
+  .status-red {
+    @apply bg-[hsl(var(--status-red))] text-white;
+  }
+
+  .status-gray {
+    @apply bg-[hsl(var(--status-gray))/30] text-[hsl(var(--status-gray))];
+  }
+
+  .image-card {
+    @apply relative overflow-hidden rounded-xl bg-card border border-border/50 transition-all duration-300;
+    box-shadow: var(--shadow-card);
+  }
+
+  .image-card:hover {
+    @apply border-primary/30;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .image-card-overlay {
+    @apply absolute inset-0 bg-black/60 opacity-0 transition-opacity duration-300 flex items-center justify-center gap-2;
+  }
+
+  .image-card:hover .image-card-overlay {
+    @apply opacity-100;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .text-gradient-gold {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-300;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  .font-display {
+    font-family: "Playfair Display", Georgia, serif;
+  }
+
+  .font-sans {
+    font-family: "Inter", system-ui, sans-serif;
+  }
+
+  /* TipTap Editor Styles */
+  .ProseMirror {
+    outline: none;
+  }
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: hsl(var(--muted-foreground));
+    opacity: 0.5;
+    pointer-events: none;
+    height: 0;
+  }
+  .ProseMirror > * + * {
+    margin-top: 0.75em;
+  }
+  .ProseMirror p {
+    @apply text-sm leading-relaxed;
+    color: #aaaaaa;
+    margin-bottom: 0;
+  }
+  .ProseMirror h2 {
+    @apply text-xl font-bold mt-6 mb-2;
+    font-family: "Inter", system-ui, sans-serif;
+  }
+  .ProseMirror h3 {
+    @apply text-lg font-semibold mt-5 mb-2;
+    font-family: "Inter", system-ui, sans-serif;
+  }
+  .ProseMirror h4 {
+    @apply text-base font-semibold mt-4 mb-1;
+    font-family: "Inter", system-ui, sans-serif;
+  }
+  .ProseMirror ul {
+    @apply list-disc pl-5 my-3;
+  }
+  .ProseMirror ol {
+    @apply list-decimal pl-5 my-3;
+  }
+  .ProseMirror li {
+    @apply my-1 text-sm;
+    color: #aaaaaa;
+  }
+  .ProseMirror li p {
+    @apply my-0;
+  }
+  .ProseMirror blockquote {
+    @apply border-l-2 border-primary/30 pl-4 italic my-3;
+    color: #999999;
+  }
+  .ProseMirror hr {
+    @apply my-6 border-border;
+  }
+  .ProseMirror a {
+    @apply text-primary underline underline-offset-2;
+  }
+  .ProseMirror strong {
+    @apply font-semibold;
+  }
+  .ProseMirror em {
+    @apply italic;
+  }
+  .ProseMirror code {
+    @apply bg-secondary px-1.5 py-0.5 rounded text-xs font-mono;
+  }
+  .ProseMirror pre {
+    @apply bg-secondary p-3 rounded-lg my-3 overflow-x-auto;
+  }
+  .ProseMirror pre code {
+    @apply bg-transparent p-0;
+  }
+
+  /* Source Material Markdown Styles */
+  .source-markdown {
+    color: #aaaaaa;
+  }
+  .source-markdown > * + * {
+    margin-top: 0.5em;
+  }
+  .source-markdown h1,
+  .source-markdown h2 {
+    @apply text-sm font-bold mt-3 mb-1;
+    color: hsl(var(--foreground));
+  }
+  .source-markdown h3,
+  .source-markdown h4 {
+    @apply text-xs font-semibold mt-2 mb-1;
+    color: hsl(var(--foreground));
+  }
+  .source-markdown p {
+    @apply my-1.5;
+  }
+  .source-markdown br {
+    display: block;
+    content: "";
+    margin-top: 0.5em;
+  }
+  .source-markdown ul {
+    @apply list-disc pl-4 my-1.5;
+  }
+  .source-markdown ol {
+    @apply list-decimal pl-4 my-1.5;
+  }
+  .source-markdown li {
+    @apply my-0.5;
+  }
+  .source-markdown table {
+    @apply w-full my-2 text-[11px];
+    border-collapse: collapse;
+  }
+  .source-markdown thead {
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  .source-markdown th {
+    @apply text-left py-1 px-2 font-semibold;
+    color: hsl(var(--foreground));
+  }
+  .source-markdown td {
+    @apply py-1 px-2;
+    border-bottom: 1px solid hsl(var(--border) / 0.3);
+  }
+  .source-markdown tbody tr:hover {
+    background: hsl(var(--secondary) / 0.3);
+  }
+  .source-markdown strong {
+    @apply font-semibold;
+    color: hsl(var(--foreground));
+  }
+  .source-markdown em {
+    @apply italic;
+  }
+  .source-markdown a {
+    @apply underline underline-offset-2;
+    color: hsl(var(--primary));
+  }
+  .source-markdown blockquote {
+    @apply border-l-2 border-primary/30 pl-3 italic my-1.5;
+    color: #999999;
+  }
+  .source-markdown code {
+    @apply bg-secondary px-1 py-0.5 rounded text-[10px] font-mono;
+  }
+  .source-markdown hr {
+    @apply my-2 border-border;
+  }
+}

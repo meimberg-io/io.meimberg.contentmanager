@@ -1,0 +1,18 @@
+<svg xml:space="preserve" viewBox="0 0 200 200" y="0px" x="0px" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<rect fill="#201f1f" height="200" width="200"></rect>
+
+  
+  <defs id="defs101773"></defs>
+  <linearGradient spreadMethod="pad" y2="30%" x2="-10%" y1="120%" x1="30%" id="3d_gradient2-logo-2e8c83c9-c85a-4d8b-a654-11985e07af78">
+    <stop id="stop101750" stop-opacity="1" stop-color="#ffffff" offset="0%"></stop>
+    <stop id="stop101752" stop-opacity="1" stop-color="#000000" offset="100%"></stop>
+  </linearGradient>
+  <linearGradient gradientTransform="rotate(-30)" spreadMethod="pad" y2="30%" x2="-10%" y1="120%" x1="30%" id="3d_gradient3-logo-2e8c83c9-c85a-4d8b-a654-11985e07af78">
+    <stop id="stop101755" stop-opacity="1" stop-color="#ffffff" offset="0%"></stop>
+    <stop id="stop101757" stop-opacity="1" stop-color="#cccccc" offset="50%"></stop>
+    <stop id="stop101759" stop-opacity="1" stop-color="#000000" offset="100%"></stop>
+  </linearGradient>
+  <path class="c1" d="M 95.028121,160.00001 H 70.857944 c -6.172735,0 -11.315534,-5.1428 -11.315534,-11.31554 V 51.313207 c 0,-6.170426 5.142799,-11.313202 11.315534,-11.313202 6.342459,0 11.485259,5.142799 11.485259,11.313202 v 85.886003 h 12.684942 c 6.342455,0 11.315535,5.1428 11.315535,11.48526 -2e-5,6.17274 -4.9731,11.31554 -11.315559,11.31554 z" stroke-miterlimit="2" id="path11" style="font-style:normal;font-weight:400;font-size:medium;line-height:1;font-family:'Brandmark Dots 1 Color';font-variant-ligatures:normal;text-align:center;text-anchor:middle;fill:#536192;stroke:#536192;stroke-width:0;stroke-linejoin:miter;stroke-miterlimit:2"></path>
+  <path class="c3" d="m 117.82891,148.68447 c 0,-6.34246 4.97075,-11.48526 11.31321,-11.48526 6.34245,0 11.31553,5.1428 11.31553,11.48526 0,6.17274 -4.97308,11.31554 -11.31553,11.31554 -6.34246,0 -11.31321,-5.1428 -11.31321,-11.31554 z" stroke-miterlimit="2" id="path13" style="font-style:normal;font-weight:400;font-size:medium;line-height:1;font-family:'Brandmark Dots 1 Color';font-variant-ligatures:normal;text-align:center;text-anchor:middle;fill:#bc8c00;stroke:#bc8c00;stroke-width:0;stroke-linejoin:miter;stroke-miterlimit:2"></path>
+
+</svg>

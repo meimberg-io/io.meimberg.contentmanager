@@ -1,0 +1,70 @@
+# Unified docker-compose.yml for both local development and production deployment
+services:
+  # Base service definition
+  admin-base:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_STORYBLOK_TOKEN=${NEXT_PUBLIC_STORYBLOK_TOKEN}
+        - NEXT_PUBLIC_STORYBLOK_DISABLECACHING=${NEXT_PUBLIC_STORYBLOK_DISABLECACHING:-false}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      # Core
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3000
+      # Auth
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - ADMIN_WHITELIST=${ADMIN_WHITELIST}
+      # Storyblok
+      - NEXT_PUBLIC_STORYBLOK_TOKEN=${NEXT_PUBLIC_STORYBLOK_TOKEN}
+      - STORYBLOK_MANAGEMENT_TOKEN=${STORYBLOK_MANAGEMENT_TOKEN}
+      - STORYBLOK_SPACE_ID=${STORYBLOK_SPACE_ID:-330326}
+      # AI Providers (at least one required)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      # Mail Inbox Import
+      - MAILINBOX_USERNAME=${MAILINBOX_USERNAME}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      # Publer
+      - PUBLER_API_KEY=${PUBLER_API_KEY}
+      - PUBLER_API_URL=${PUBLER_API_URL:-https://app.publer.com/api/v1}
+      - PUBLER_WORKSPACE_ID=${PUBLER_WORKSPACE_ID}
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service with volume mounts
+  admin-dev:
+    profiles: ["dev"]
+    extends: admin-base
+    volumes:
+      - ./src:/app/src:ro
+      - ./public:/app/public:ro
+      - ./next.config.ts:/app/next.config.ts:ro
+      - ./tailwind.config.ts:/app/tailwind.config.ts:ro
+      - ./postcss.config.js:/app/postcss.config.js:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      - /app/node_modules
+
+  # Production service without volume mounts
+  admin-prod:
+    profiles: ["prod"]
+    extends: admin-base
+
+networks:
+  app-network:
+    driver: bridge
