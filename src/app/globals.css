@@ -12,8 +12,10 @@
 @tailwind components;
 @tailwind utilities;
 
+input,
 textarea {
   color: #aaaaaa;
+  font-size: 0.75rem; /* 12px */
 }
 
 @layer base {

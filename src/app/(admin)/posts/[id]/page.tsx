@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { BlogPost } from "@/types";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
-import { StatusRow } from "@/components/ui/StatusIcon";
+// StatusRow removed - using inline StatusDot instead
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -105,7 +105,7 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [generating, setGenerating] = useState<string | null>(null);
+  const [generating, setGenerating] = useState<Set<string>>(new Set());
 
   // AI Settings
   const [aiModels, setAiModels] = useState<AIModel[]>([]);
@@ -386,9 +386,19 @@ export default function PostDetailPage() {
     }
   };
 
+  // Helper to mark a field as generating / done
+  const startGenerating = (type: string) =>
+    setGenerating((prev) => new Set(prev).add(type));
+  const stopGenerating = (type: string) =>
+    setGenerating((prev) => {
+      const next = new Set(prev);
+      next.delete(type);
+      return next;
+    });
+
   const handleGenerate = async (type: string) => {
     if (!post) return;
-    setGenerating(type);
+    startGenerating(type);
 
     try {
       const response = await fetch("/api/ai/generate", {
@@ -408,38 +418,28 @@ export default function PostDetailPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Generation failed");
 
-      // Update form with generated content
-      if (type === "all") {
-        setForm((prev) => ({
-          ...prev,
-          pagetitle: data.pagetitle || prev.pagetitle,
-          pageintro: data.pageintro || prev.pageintro,
-          teasertitle: data.teasertitle || prev.teasertitle,
-          abstract: data.abstract || prev.abstract,
-          readmoretext: data.readmoretext || prev.readmoretext,
-        }));
-      } else if (data[type] !== undefined) {
+      if (data[type] !== undefined) {
         setForm((prev) => ({ ...prev, [type]: data[type] }));
       }
 
       toast({
         title: "Content generated",
-        description: `Generated ${type === "all" ? "all fields" : type} using ${data.modelUsed}`,
+        description: `Generated ${type} using ${data.modelUsed}`,
       });
     } catch (error: any) {
       toast({
-        title: "Generation failed",
+        title: `Generation failed (${type})`,
         description: error.message,
         variant: "destructive",
       });
     } finally {
-      setGenerating(null);
+      stopGenerating(type);
     }
   };
 
   const handleGenerateBody = async () => {
     if (!post) return;
-    setGenerating("body");
+    startGenerating("body");
 
     try {
       const response = await fetch("/api/ai/generate", {
@@ -459,16 +459,12 @@ export default function PostDetailPage() {
       if (!response.ok) throw new Error(data.error || "Generation failed");
 
       if (data.bodyContent) {
-        // Create a richtext block with the generated content
         const newBlock = {
           _uid: crypto.randomUUID().replace(/-/g, "").substring(0, 36),
           component: "richtext",
           content: data.bodyContent,
         };
-
-        // Insert at the top of body blocks
         setBodyBlocks((prev) => [newBlock, ...prev]);
-
         toast({
           title: "Article generated",
           description: `Body content generated using ${data.modelUsed}. Don't forget to save!`,
@@ -476,13 +472,25 @@ export default function PostDetailPage() {
       }
     } catch (error: any) {
       toast({
-        title: "Generation failed",
+        title: "Generation failed (body)",
         description: error.message,
         variant: "destructive",
       });
     } finally {
-      setGenerating(null);
+      stopGenerating("body");
     }
+  };
+
+  const handleGenerateAll = async () => {
+    if (!post) return;
+    // Fire all individual generators in parallel, each using its own prompt
+    const metaFields = ["pagetitle", "pageintro", "teasertitle", "abstract", "readmoretext"] as const;
+    const tasks: Promise<void>[] = metaFields.map((field) => handleGenerate(field));
+    tasks.push(handleGenerateBody());
+    if (post.sourceRaw || post.sourceSummarized) {
+      tasks.push(handleGenerateImagePrompt());
+    }
+    await Promise.allSettled(tasks);
   };
 
   // ─── Header Image Generation ────────────────────────────────
@@ -608,7 +616,6 @@ export default function PostDetailPage() {
                 {post.pagetitle || post.slug}
               </h1>
               <div className="flex items-center gap-3 mt-1">
-                <StatusRow status={post.status} size="md" />
                 <span className="text-sm text-muted-foreground truncate">
                   /{post.slug}
                 </span>
@@ -688,9 +695,9 @@ export default function PostDetailPage() {
                 size="sm"
                 className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => handleGenerateBody()}
-                disabled={!!generating}
+                disabled={generating.has("body")}
               >
-                {generating === "body" ? (
+                {generating.has("body") ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
@@ -769,68 +776,187 @@ export default function PostDetailPage() {
 
       {/* ═══ RIGHT COLUMN: Meta ═══ */}
       <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-        {/* Source Material */}
-        {hasSource && (
+        {/* 1. Meta Fields (Collapsible) */}
+        <Collapsible open={showMetaFields} onOpenChange={setShowMetaFields}>
           <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3 animate-fade-in">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-sm">Source Material</span>
-              <Badge variant="secondary" className="text-[10px]">
-                Read-only
-              </Badge>
-            </div>
-
-            {post.sourceSummarized && (
-              <Collapsible defaultOpen>
-                <div className="flex items-center justify-between mb-1">
-                  <CollapsibleTrigger className="flex items-center gap-1 text-left">
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
-                    <Label className="text-xs text-muted-foreground cursor-pointer">
-                      Summary
-                    </Label>
-                  </CollapsibleTrigger>
-                  <button
-                    className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                    onClick={() => {
-                      setEditSummaryText(post.sourceSummarized || "");
-                      setEditSummaryOpen(true);
-                    }}
-                    title="Edit summary"
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </button>
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center justify-between w-full hover:opacity-80 transition-opacity text-left">
+                <div className="flex items-center gap-2">
+                  <PenLine className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">Meta Fields</span>
                 </div>
-                <CollapsibleContent>
-                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-64 overflow-y-auto mt-2">
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                      {fixTables(post.sourceSummarized)}
-                    </ReactMarkdown>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
+                {showMetaFields ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+            </CollapsibleTrigger>
 
-            {post.sourceRaw && (
-              <Collapsible>
-                <CollapsibleTrigger className="flex items-center gap-1 w-full text-left mb-1">
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
-                  <Label className="text-xs text-muted-foreground cursor-pointer">
-                    Raw Transcription
-                  </Label>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-48 overflow-y-auto mt-2">
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                      {fixTables(post.sourceRaw)}
-                    </ReactMarkdown>
+            <CollapsibleContent>
+              <div className="space-y-3 pt-2">
+                {/* Slug */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="slug" className="text-xs text-muted-foreground">Slug</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="slug"
+                        value={slugValue}
+                        onChange={(e) => setSlugValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                        placeholder="url-slug"
+                        className="bg-secondary/50 pr-20"
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                        {form.pagetitle && slugValue !== deriveSlug(form.pagetitle) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => setSlugValue(deriveSlug(form.pagetitle))}
+                            title="Generate from title"
+                          >
+                            <Wand2 className="h-3 w-3 text-blue-500" />
+                          </Button>
+                        )}
+                        {slugValue !== originalSlug && originalSlug && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => setSlugValue(originalSlug)}
+                            title="Reset to original"
+                          >
+                            <RotateCcw className="h-3 w-3 text-muted-foreground" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
+                  {slugValue !== originalSlug && slugValue && (
+                    <p className="text-xs text-primary">
+                      Slug will change to: {slugValue}
+                    </p>
+                  )}
+                </div>
+
+                <FieldWithAI
+                  label="Page Title"
+                  id="pagetitle"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("pagetitle")}
+                >
+                  <Input
+                    id="pagetitle"
+                    value={form.pagetitle}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, pagetitle: e.target.value }))
+                    }
+                    placeholder="Blog post title"
+                  />
+                </FieldWithAI>
+
+                <FieldWithAI
+                  label="Page Intro"
+                  id="pageintro"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("pageintro")}
+                >
+                  <Textarea
+                    id="pageintro"
+                    value={form.pageintro}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, pageintro: e.target.value }))
+                    }
+                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                    placeholder="Introduction text"
+                    rows={1}
+                    className="resize-none overflow-hidden"
+                  />
+                </FieldWithAI>
+
+                <FieldWithAI
+                  label="Teaser Title"
+                  id="teasertitle"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("teasertitle")}
+                >
+                  <Input
+                    id="teasertitle"
+                    value={form.teasertitle}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, teasertitle: e.target.value }))
+                    }
+                    placeholder="Teaser title for previews"
+                  />
+                </FieldWithAI>
+
+                <FieldWithAI
+                  label="Abstract"
+                  id="abstract"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("abstract")}
+                >
+                  <Textarea
+                    id="abstract"
+                    value={form.abstract}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, abstract: e.target.value }))
+                    }
+                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                    placeholder="Short summary / teaser text"
+                    rows={1}
+                    className="resize-none overflow-hidden"
+                  />
+                </FieldWithAI>
+
+                <FieldWithAI
+                  label="Read More Text"
+                  id="readmoretext"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("readmoretext")}
+                >
+                  <Input
+                    id="readmoretext"
+                    value={form.readmoretext}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        readmoretext: e.target.value,
+                      }))
+                    }
+                    placeholder="Call to action text"
+                  />
+                </FieldWithAI>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="date" className="text-xs">Date</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={form.date}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, date: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+            </CollapsibleContent>
           </div>
-        )}
+        </Collapsible>
 
-        {/* AI Settings (Collapsible) */}
+        {/* 2. Status (compact one-line) */}
+        <div className="rounded-lg border border-border/50 bg-card px-4 py-3 animate-fade-in">
+          <div className="flex items-center gap-4 text-xs">
+            <StatusDot label="Content" color={post.status.contentComplete.color} />
+            <StatusDot label="Published" color={post.status.published.color} />
+            <StatusDot label="Publer" color={post.status.publishedPubler.color} />
+          </div>
+        </div>
+
+        {/* 3. AI Settings (Collapsible) */}
         <Collapsible open={showAiSettings} onOpenChange={setShowAiSettings}>
           <div className="rounded-lg border border-blue-500/30 bg-card p-4 space-y-3 animate-fade-in">
             <CollapsibleTrigger asChild>
@@ -999,10 +1125,10 @@ export default function PostDetailPage() {
                 size="sm"
                 variant="default"
                 className="w-full gap-1.5 mt-2 bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => handleGenerate("all")}
-                disabled={!!generating}
+                onClick={() => handleGenerateAll()}
+                disabled={generating.size > 0}
               >
-                {generating === "all" ? (
+                {generating.size > 0 ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
@@ -1013,244 +1139,66 @@ export default function PostDetailPage() {
           </div>
         </Collapsible>
 
-        {/* Meta Fields (Collapsible) */}
-        <Collapsible open={showMetaFields} onOpenChange={setShowMetaFields}>
+        {/* 4. Source Material */}
+        {hasSource && (
           <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3 animate-fade-in">
-            <CollapsibleTrigger asChild>
-              <button className="flex items-center justify-between w-full hover:opacity-80 transition-opacity text-left">
-                <div className="flex items-center gap-2">
-                  <PenLine className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-sm">Meta Fields</span>
-                </div>
-                {showMetaFields ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
-            </CollapsibleTrigger>
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm">Source Material</span>
+              <Badge variant="secondary" className="text-[10px]">
+                Read-only
+              </Badge>
+            </div>
 
-            <CollapsibleContent>
-              <div className="space-y-3 pt-2">
-                {/* Slug */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="slug" className="text-xs text-muted-foreground">Slug</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        id="slug"
-                        value={slugValue}
-                        onChange={(e) => setSlugValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                        placeholder="url-slug"
-                        className="text-sm bg-secondary/50 pr-20"
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                        {form.pagetitle && slugValue !== deriveSlug(form.pagetitle) && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => setSlugValue(deriveSlug(form.pagetitle))}
-                            title="Generate from title"
-                          >
-                            <Wand2 className="h-3 w-3 text-blue-500" />
-                          </Button>
-                        )}
-                        {slugValue !== originalSlug && originalSlug && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => setSlugValue(originalSlug)}
-                            title="Reset to original"
-                          >
-                            <RotateCcw className="h-3 w-3 text-muted-foreground" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+            {post.sourceSummarized && (
+              <Collapsible defaultOpen>
+                <div className="flex items-center justify-between mb-1">
+                  <CollapsibleTrigger className="flex items-center gap-1 text-left">
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
+                    <Label className="text-xs text-muted-foreground cursor-pointer">
+                      Summary
+                    </Label>
+                  </CollapsibleTrigger>
+                  <button
+                    className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                    onClick={() => {
+                      setEditSummaryText(post.sourceSummarized || "");
+                      setEditSummaryOpen(true);
+                    }}
+                    title="Edit summary"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                </div>
+                <CollapsibleContent>
+                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-64 overflow-y-auto mt-2">
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                      {fixTables(post.sourceSummarized)}
+                    </ReactMarkdown>
                   </div>
-                  {slugValue !== originalSlug && slugValue && (
-                    <p className="text-xs text-primary">
-                      Slug will change to: {slugValue}
-                    </p>
-                  )}
-                </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
 
-                <FieldWithAI
-                  label="Page Title"
-                  id="pagetitle"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("pagetitle")}
-                >
-                  <Input
-                    id="pagetitle"
-                    value={form.pagetitle}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, pagetitle: e.target.value }))
-                    }
-                    placeholder="Blog post title"
-                    className="text-sm"
-                  />
-                </FieldWithAI>
-
-                <FieldWithAI
-                  label="Page Intro"
-                  id="pageintro"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("pageintro")}
-                >
-                  <Textarea
-                    id="pageintro"
-                    value={form.pageintro}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, pageintro: e.target.value }))
-                    }
-                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
-                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-                    placeholder="Introduction text"
-                    rows={1}
-                    className="text-sm resize-none overflow-hidden"
-                  />
-                </FieldWithAI>
-
-                <FieldWithAI
-                  label="Teaser Title"
-                  id="teasertitle"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("teasertitle")}
-                >
-                  <Input
-                    id="teasertitle"
-                    value={form.teasertitle}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, teasertitle: e.target.value }))
-                    }
-                    placeholder="Teaser title for previews"
-                    className="text-sm"
-                  />
-                </FieldWithAI>
-
-                <FieldWithAI
-                  label="Abstract"
-                  id="abstract"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("abstract")}
-                >
-                  <Textarea
-                    id="abstract"
-                    value={form.abstract}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, abstract: e.target.value }))
-                    }
-                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
-                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-                    placeholder="Short summary / teaser text"
-                    rows={1}
-                    className="text-sm resize-none overflow-hidden"
-                  />
-                </FieldWithAI>
-
-                <FieldWithAI
-                  label="Read More Text"
-                  id="readmoretext"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("readmoretext")}
-                >
-                  <Input
-                    id="readmoretext"
-                    value={form.readmoretext}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        readmoretext: e.target.value,
-                      }))
-                    }
-                    placeholder="Call to action text"
-                    className="text-sm"
-                  />
-                </FieldWithAI>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="date" className="text-xs">Date</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={form.date}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, date: e.target.value }))
-                    }
-                    className="text-sm"
-                  />
-                </div>
-              </div>
-            </CollapsibleContent>
+            {post.sourceRaw && (
+              <Collapsible>
+                <CollapsibleTrigger className="flex items-center gap-1 w-full text-left mb-1">
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
+                  <Label className="text-xs text-muted-foreground cursor-pointer">
+                    Raw Transcription
+                  </Label>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-48 overflow-y-auto mt-2">
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                      {fixTables(post.sourceRaw)}
+                    </ReactMarkdown>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </div>
-        </Collapsible>
-
-        {/* Status Overview */}
-        <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3 animate-fade-in">
-          <span className="font-medium text-sm">Status</span>
-          <div className="space-y-2">
-            <StatusItem
-              label="Content"
-              color={post.status.contentComplete.color}
-              text={
-                post.status.contentComplete.completed
-                  ? "Complete"
-                  : post.status.contentComplete.color === "yellow"
-                    ? "Fields filled"
-                    : "Incomplete"
-              }
-            />
-            <StatusItem
-              label="Published"
-              color={post.status.published.color}
-              text={
-                post.status.published.completed
-                  ? "Published"
-                  : "Draft"
-              }
-            />
-            <StatusItem
-              label="Publer"
-              color={post.status.publishedPubler.color}
-              text={
-                post.status.publishedPubler.completed
-                  ? "Shared"
-                  : "Not shared"
-              }
-            />
-          </div>
-          <div className="pt-2 border-t border-border/30 text-xs text-muted-foreground space-y-0.5">
-            <div>
-              Header Picture:{" "}
-              {post.headerpicture ? (
-                <span className="text-green-500">Set</span>
-              ) : (
-                <span className="text-red-400">Not set</span>
-              )}
-            </div>
-            <div>
-              Teaser Image:{" "}
-              {post.teaserimage ? (
-                <span className="text-green-500">Set</span>
-              ) : (
-                <span className="text-red-400">Not set</span>
-              )}
-            </div>
-            <div>
-              Body:{" "}
-              {bodyBlocks.length > 0 ? (
-                <span className="text-green-500">
-                  {bodyBlocks.length} block{bodyBlocks.length !== 1 ? "s" : ""}
-                </span>
-              ) : (
-                <span className="text-red-400">Empty</span>
-              )}
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Edit Summary Dialog */}
@@ -1313,10 +1261,11 @@ function FieldWithAI({
 }: {
   label: string;
   id: string;
-  generating: string | null;
+  generating: Set<string>;
   onGenerate: () => void;
   children: React.ReactNode;
 }) {
+  const isGenerating = generating.has(id);
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -1326,9 +1275,9 @@ function FieldWithAI({
           size="sm"
           className="gap-1 h-7 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
           onClick={onGenerate}
-          disabled={!!generating}
+          disabled={isGenerating}
         >
-          {generating === id ? (
+          {isGenerating ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
             <Sparkles className="h-3 w-3" />
@@ -1341,15 +1290,7 @@ function FieldWithAI({
   );
 }
 
-function StatusItem({
-  label,
-  color,
-  text,
-}: {
-  label: string;
-  color: string;
-  text: string;
-}) {
+function StatusDot({ label, color }: { label: string; color: string }) {
   const dotColor =
     color === "green"
       ? "bg-green-500"
@@ -1360,12 +1301,9 @@ function StatusItem({
           : "bg-gray-400";
 
   return (
-    <div className="flex items-center justify-between text-sm">
+    <div className="flex items-center gap-1.5">
+      <div className={cn("h-2 w-2 rounded-full", dotColor)} />
       <span className="text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-1.5">
-        <div className={cn("h-2 w-2 rounded-full", dotColor)} />
-        <span className="text-xs">{text}</span>
-      </div>
     </div>
   );
 }
