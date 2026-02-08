@@ -39,6 +39,8 @@ import {
   ImageIcon,
   RefreshCw,
   Pencil,
+  RotateCcw,
+  Wand2,
 } from "lucide-react";
 import {
   Dialog,
@@ -55,6 +57,19 @@ import remarkBreaks from "remark-breaks";
 
 /** remark-gfm can't parse tables directly after list items – insert a blank line before them */
 const fixTables = (s: string) => s.replace(/([^\n|])\n(\|)/g, '$1\n\n$2');
+
+/** Derive a URL slug from a title */
+function deriveSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[äÄ]/g, "ae")
+    .replace(/[öÖ]/g, "oe")
+    .replace(/[üÜ]/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 // Dynamic import BodyEditor to avoid SSR issues with dnd-kit/tiptap
 const BodyEditor = dynamic(
@@ -111,6 +126,10 @@ export default function PostDetailPage() {
   const [editSummaryOpen, setEditSummaryOpen] = useState(false);
   const [editSummaryText, setEditSummaryText] = useState("");
 
+  // Slug
+  const [slugValue, setSlugValue] = useState("");
+  const [originalSlug, setOriginalSlug] = useState("");
+
   // Editable fields
   const [form, setForm] = useState({
     pagetitle: "",
@@ -151,6 +170,8 @@ export default function PostDetailPage() {
         readmoretext: transformed.readmoretext,
         date: transformed.date,
       });
+      setSlugValue(transformed.slug);
+      setOriginalSlug(transformed.slug);
       setBodyBlocks(transformed.body || []);
       setHeaderPictureUrl(transformed.headerpicture);
       setGeneratedImageBase64(null); // Clear any preview on reload
@@ -247,6 +268,7 @@ export default function PostDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: post.storyblokId,
+          ...(slugValue !== originalSlug ? { slug: slugValue } : {}),
           ...form,
           body: bodyBlocks,
           cm_ai_hint: transientPromptHint || "",
@@ -1010,6 +1032,51 @@ export default function PostDetailPage() {
 
             <CollapsibleContent>
               <div className="space-y-3 pt-2">
+                {/* Slug */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="slug" className="text-xs text-muted-foreground">Slug</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="slug"
+                        value={slugValue}
+                        onChange={(e) => setSlugValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                        placeholder="url-slug"
+                        className="text-sm bg-secondary/50 pr-20"
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                        {form.pagetitle && slugValue !== deriveSlug(form.pagetitle) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => setSlugValue(deriveSlug(form.pagetitle))}
+                            title="Generate from title"
+                          >
+                            <Wand2 className="h-3 w-3 text-blue-500" />
+                          </Button>
+                        )}
+                        {slugValue !== originalSlug && originalSlug && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => setSlugValue(originalSlug)}
+                            title="Reset to original"
+                          >
+                            <RotateCcw className="h-3 w-3 text-muted-foreground" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {slugValue !== originalSlug && slugValue && (
+                    <p className="text-xs text-primary">
+                      Slug will change to: {slugValue}
+                    </p>
+                  )}
+                </div>
+
                 <FieldWithAI
                   label="Page Title"
                   id="pagetitle"

@@ -82,11 +82,13 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json()
-    const { id, ...updates } = body
+    const { id, slug: newSlug, ...updates } = body
     
-    const options = updates.pagetitle ? { storyName: updates.pagetitle } : undefined
+    const options: { storyName?: string; slug?: string } = {}
+    if (updates.pagetitle) options.storyName = updates.pagetitle
+    if (newSlug) options.slug = newSlug
     
-    const result = await updatePost(id, updates, options)
+    const result = await updatePost(id, updates, Object.keys(options).length ? options : undefined)
     
     return NextResponse.json(result)
   } catch (error: any) {
