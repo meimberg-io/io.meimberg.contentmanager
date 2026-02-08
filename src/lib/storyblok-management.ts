@@ -151,7 +151,7 @@ export async function createPost(data: BlogPostData & { name: string }) {
 export async function updatePost(
   storyId: string, 
   data: Partial<BlogPostData>,
-  options?: { storyName?: string }
+  options?: { storyName?: string; slug?: string }
 ) {
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
@@ -173,6 +173,9 @@ export async function updatePost(
   
   if (options?.storyName) {
     storyUpdate.name = options.storyName
+  }
+  if (options?.slug) {
+    storyUpdate.slug = options.slug
   }
   
   const response = await fetch(
