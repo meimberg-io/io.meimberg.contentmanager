@@ -286,7 +286,7 @@ export default function SettingsPage() {
                 </div>
                 <Textarea
                   id={`prompt-${field.key}`}
-                  className="font-mono text-sm bg-secondary/50 resize-none overflow-hidden"
+                  className="font-mono bg-secondary/50 resize-none overflow-hidden"
                   value={prompts[field.key] || ''}
                   onChange={(e) => setPromptValue(field.key, e.target.value)}
                   onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
@@ -385,7 +385,7 @@ export default function SettingsPage() {
             </p>
             <Textarea
               placeholder="Save prompts, ideas, or any text here..."
-              className="font-mono text-sm bg-secondary/50 resize-none overflow-hidden"
+              className="font-mono bg-secondary/50 resize-none overflow-hidden"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
