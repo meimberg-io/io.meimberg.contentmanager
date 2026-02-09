@@ -8,6 +8,7 @@ import {
   generateReadMoreText,
   generateAllFromSource,
   generateBody,
+  optimizeText,
 } from '@/lib/openai'
 import { updatePost } from '@/lib/storyblok-management'
 import { getSettings } from '@/lib/settings-storage'
@@ -34,9 +35,12 @@ export async function POST(request: Request) {
       sourceSummarized, 
       hint, 
       modelId: requestModelId,
-      existingContent 
+      existingContent,
+      text: optimizeInputText,
+      instruction: optimizeInstruction,
+      isFullDocument,
     } = body
-    // type: 'pagetitle' | 'abstract' | 'pageintro' | 'teasertitle' | 'readmoretext' | 'all' | 'body'
+    // type: 'pagetitle' | 'abstract' | 'pageintro' | 'teasertitle' | 'readmoretext' | 'all' | 'body' | 'optimize'
 
     // Get settings (model + prompts)
     const settings = await getSettings()
@@ -115,6 +119,21 @@ export async function POST(request: Request) {
           modelId,
           storedPrompts.generateAll || ''
         )
+        break
+
+      case 'optimize':
+        if (!optimizeInputText) {
+          return NextResponse.json({ error: 'Text to optimize is required' }, { status: 400 })
+        }
+        if (!optimizeInstruction) {
+          return NextResponse.json({ error: 'Optimization instruction is required' }, { status: 400 })
+        }
+        result = await optimizeText({
+          text: optimizeInputText,
+          instruction: optimizeInstruction,
+          isFullDocument: !!isFullDocument,
+          modelId,
+        })
         break
       
       default:

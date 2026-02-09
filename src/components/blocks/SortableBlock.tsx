@@ -51,7 +51,7 @@ export function SortableBlock({ id, block, onChange, onDelete }: SortableBlockPr
   const renderEditor = () => {
     switch (block.component) {
       case "richtext":
-        return <RichtextBlock data={block} onChange={onChange} />;
+        return <RichtextBlock data={block} onChange={onChange} blockUid={block._uid} />;
       case "picture":
         return <PictureBlock data={block} onChange={onChange} />;
       case "youtube":

@@ -307,6 +307,49 @@ function parseInlineMarks(text: string): any[] {
 }
 
 /**
+ * Optimize text based on a user instruction.
+ * If isFullDocument is true, the AI is told to return markdown and the result
+ * is converted to ProseMirror JSON.  Otherwise plain text is returned.
+ */
+export async function optimizeText(options: {
+  text: string
+  instruction: string
+  isFullDocument: boolean
+  modelId?: string
+}): Promise<{ optimizedText?: string; bodyContent?: any }> {
+  const wrapperPrompt = options.isFullDocument
+    ? [
+        'Du bist ein professioneller Texteditor. Der Nutzer gibt dir einen bestehenden Blogartikel-Text und eine Anweisung, wie der Text verbessert werden soll.',
+        'Wende die Anweisung an und gib den gesamten überarbeiteten Artikel zurück.',
+        'Behalte die bestehende Struktur (Überschriften, Listen, Absätze, Formatierungen wie **fett** und *kursiv*) bei, sofern die Anweisung nichts anderes verlangt.',
+        'Antworte NUR mit dem überarbeiteten Text in Markdown. Keine Erklärung, kein Meta-Kommentar.',
+        '',
+        `## Anweisung:\n${options.instruction}`,
+        '',
+        `## Text:\n${options.text}`,
+      ].join('\n')
+    : [
+        'Du bist ein professioneller Texteditor. Der Nutzer gibt dir einen Textausschnitt und eine Anweisung, wie der Text verbessert werden soll.',
+        'Wende die Anweisung an und gib NUR den überarbeiteten Text zurück. Keine Erklärung, kein Meta-Kommentar.',
+        'Behalte Formatierungen bei, sofern die Anweisung nichts anderes verlangt.',
+        '',
+        `## Anweisung:\n${options.instruction}`,
+        '',
+        `## Text:\n${options.text}`,
+      ].join('\n')
+
+  const response = await callAI({ prompt: wrapperPrompt, modelId: options.modelId })
+  const result = response.trim()
+
+  if (options.isFullDocument) {
+    const prosemirrorDoc = markdownToProsemirror(result)
+    return { bodyContent: prosemirrorDoc }
+  }
+
+  return { optimizedText: result }
+}
+
+/**
  * Generate a DALL-E prompt from source material using AI
  */
 export async function generateImagePrompt(options: BlogGenerationOptions): Promise<string> {
