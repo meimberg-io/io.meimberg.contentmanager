@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-guard'
 import { createPost, updatePost, deletePost, fetchBlogPostsManagement } from '@/lib/storyblok-management'
+import { fetchBlogPosts } from '@/lib/storyblok'
 
 /**
  * GET /api/posts
@@ -18,10 +19,57 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const perPage = parseInt(searchParams.get('perPage') || '100')
-    
-    // Use Management API to get publish status
-    const stories = await fetchBlogPostsManagement({ page, perPage })
-    
+
+    // Fetch content (CDN) + publish metadata (Management) in parallel.
+    // This avoids rate-limit loops while keeping list status accurate.
+    const [cdnResult, mgmtResult] = await Promise.allSettled([
+      fetchBlogPosts({ page, perPage }),
+      fetchBlogPostsManagement({ page, perPage }),
+    ])
+
+    const cdnStories = cdnResult.status === 'fulfilled' ? (cdnResult.value?.stories || []) : []
+    const mgmtStories = mgmtResult.status === 'fulfilled' ? mgmtResult.value : []
+
+    if (cdnResult.status === 'rejected') {
+      console.warn('[API /api/posts] CDN fetch failed:', cdnResult.reason?.message || cdnResult.reason)
+    }
+    if (mgmtResult.status === 'rejected') {
+      console.warn('[API /api/posts] Management fetch failed (continuing with CDN data):', mgmtResult.reason?.message || mgmtResult.reason)
+    }
+
+    // If CDN is unavailable, fall back to management list (better than empty list)
+    let stories = cdnStories
+    if (stories.length === 0 && mgmtStories.length > 0) {
+      stories = mgmtStories
+    } else if (stories.length > 0 && mgmtStories.length > 0) {
+      // Merge publish metadata from management into CDN stories by UUID/ID/slug
+      const byUuid = new Map<string, any>()
+      const byId = new Map<string, any>()
+      const bySlug = new Map<string, any>()
+      for (const s of mgmtStories) {
+        if (s?.uuid) byUuid.set(String(s.uuid), s)
+        if (s?.id) byId.set(String(s.id), s)
+        if (s?.slug) bySlug.set(String(s.slug), s)
+      }
+
+      stories = stories.map((s: any) => {
+        const m =
+          byUuid.get(String(s.uuid || '')) ||
+          byId.get(String(s.id || '')) ||
+          bySlug.get(String(s.slug || ''))
+
+        if (!m) return s
+
+        return {
+          ...s,
+          // Ensure publish flags reflect management state when available
+          published: m.published ?? s.published,
+          published_at: m.published_at ?? s.published_at,
+          unpublished_changes: m.unpublished_changes ?? s.unpublished_changes,
+        }
+      })
+    }
+
     return NextResponse.json({
       posts: stories,
       total: stories.length,

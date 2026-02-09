@@ -10,6 +10,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Search, 
   LayoutGrid, 
@@ -17,11 +33,14 @@ import {
   X,
   Filter,
   Check,
+  ChevronDown,
+  Trash2,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
+import { toast } from "@/hooks/use-toast";
 
 // Multi-state filter
 interface StatusFilter {
@@ -154,6 +173,8 @@ function AllPostsPageContent() {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // Sync state FROM URL
   useEffect(() => {
@@ -211,6 +232,9 @@ function AllPostsPageContent() {
     async function loadData() {
       try {
         const response = await fetch('/api/posts');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch posts (${response.status})`);
+        }
         const data = await response.json();
         
         const transformedPosts = (data.posts || []).map(transformStoryblokBlog);
@@ -230,6 +254,46 @@ function AllPostsPageContent() {
       setSelectedPosts(new Set());
     } else {
       setSelectedPosts(new Set(posts.map((p) => p.id)));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedPosts.size === 0 || deleting) return;
+
+    setDeleting(true);
+    try {
+      const selectedIds = new Set(selectedPosts);
+      const selectedStoryblokIds = posts
+        .filter((p) => selectedIds.has(p.id))
+        .map((p) => p.storyblokId)
+        .filter(Boolean);
+
+      for (const storyblokId of selectedStoryblokIds) {
+        const response = await fetch(`/api/posts?id=${encodeURIComponent(String(storyblokId))}`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || `Failed to delete post ${storyblokId}`);
+        }
+      }
+
+      setPosts((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+      setSelectedPosts(new Set());
+      setConfirmDeleteOpen(false);
+      toast({
+        title: "Posts deleted",
+        description: `${selectedIds.size} post${selectedIds.size === 1 ? "" : "s"} deleted successfully.`,
+      });
+    } catch (error) {
+      console.error("Failed to delete selected posts:", error);
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete one or more posts. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -451,8 +515,50 @@ function AllPostsPageContent() {
             >
               {selectedPosts.size === posts.length ? "Deselect All" : "Select All"}
             </Button>
+            {selectedPosts.size > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="ml-2 gap-2" disabled={deleting}>
+                    Actions ({selectedPosts.size})
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="bg-popover">
+                  <DropdownMenuItem
+                    onClick={() => setConfirmDeleteOpen(true)}
+                    className="text-red-400 focus:text-red-300"
+                    disabled={deleting}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
+
+        <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete selected posts?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete {selectedPosts.size} post{selectedPosts.size === 1 ? "" : "s"}.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteSelected}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Post Grid/List */}
         <div

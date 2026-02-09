@@ -42,7 +42,7 @@ export default function DashboardPage() {
 
         const activities = sortedPosts.slice(0, 5).map((post: any) => ({
           id: post.id,
-          postId: post.id,
+          postId: post.slug,
           postTitle: post.pagetitle || post.slug || 'Untitled',
           action: getLatestAction(post),
           timestamp: post.lastModified || post.createdAt,

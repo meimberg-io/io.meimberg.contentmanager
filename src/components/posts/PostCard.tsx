@@ -55,8 +55,8 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
         )}
 
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{post.pagetitle || post.slug}</p>
-          <p className="text-sm text-muted-foreground truncate">{post.abstract}</p>
+          <p className="font-medium break-words">{post.pagetitle || post.slug}</p>
+          <p className="text-sm text-muted-foreground break-words whitespace-normal">{post.abstract}</p>
         </div>
 
         <div className="flex items-center gap-3">
