@@ -350,7 +350,8 @@ export async function fetchSinglePostManagement(slug: string) {
 }
 
 /**
- * Fetch blog posts via Management API (includes publish status)
+ * Fetch blog posts via Management API (list endpoint).
+ * Keep this lightweight to avoid Storyblok rate limits on list page.
  */
 export async function fetchBlogPostsManagement(options?: {
   perPage?: number

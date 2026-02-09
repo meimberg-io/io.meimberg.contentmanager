@@ -42,7 +42,7 @@ export function ActivityList({ activities }: ActivityListProps) {
           key={activity.id}
           href={`/posts/${activity.postId}`}
           className={cn(
-            "flex items-center gap-4 rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary/30 hover:bg-card/80 cursor-pointer",
+            "w-full max-w-full overflow-hidden flex items-center gap-4 rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary/30 hover:bg-card/80 cursor-pointer",
             "animate-slide-up"
           )}
           style={{ animationDelay: `${index * 50}ms` }}

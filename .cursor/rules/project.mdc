@@ -35,3 +35,26 @@ for (const item of items) {
 - Content complete requires ALL 9 fields: pagetitle, pageintro, teasertitle, abstract, teaserimage, readmoretext, date, headerpicture, body
 - Publish state uses Storyblok native publish/unpublish (not a custom field)
 - Source material (source_raw, source_summarized) comes from Plaud email import
+# meimberg.io Contentmanager Frontend
+
+## Build Check Policy
+
+**DO NOT run `npm run build` after every change!**
+
+The dev server (`npm run dev`) provides hot reload and shows errors immediately. Running `npm run build`:
+- Stops the dev server
+- Forces the user to restart it manually
+- Wastes time
+
+**Only run `npm run build` when:**
+- Explicitly preparing for deployment
+- User specifically requests a build check
+- Major refactoring where you need to verify the full build
+
+**For normal changes:** Trust hot reload. Skip the build check.
+
+## Dialog / Confirmation Policy
+
+- Use the existing modal dialog components for confirmations (`AlertDialog` / `Dialog`)
+- For destructive actions (delete/unpublish/reset), always show a modal confirm dialog
+- Do NOT use native browser dialogs (`window.confirm`, `window.alert`, `window.prompt`) in app UI

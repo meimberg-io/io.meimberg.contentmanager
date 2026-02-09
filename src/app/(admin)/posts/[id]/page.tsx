@@ -937,21 +937,7 @@ export default function PostDetailPage() {
 
           {/* Publish Controls */}
           <div className="flex items-center gap-2">
-            {post.status.published.completed ? (
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handleUnpublish}
-                disabled={publishing}
-              >
-                {publishing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <GlobeIcon className="h-4 w-4 text-green-500" />
-                )}
-                Published — Unpublish
-              </Button>
-            ) : (
+            {post.status.published.color === "red" && (
               <Button
                 variant="default"
                 className="gap-2"
@@ -963,7 +949,54 @@ export default function PostDetailPage() {
                 ) : (
                   <Globe className="h-4 w-4" />
                 )}
-                Publish to Storyblok
+                Publish initially
+              </Button>
+            )}
+
+            {post.status.published.color === "yellow" && (
+              <>
+                <Button
+                  variant="default"
+                  className="gap-2"
+                  onClick={handlePublish}
+                  disabled={publishing}
+                >
+                  {publishing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Globe className="h-4 w-4" />
+                  )}
+                  Publish changes
+                </Button>
+                <Button
+                  variant="default"
+                  className="gap-2 bg-red-600 hover:bg-red-700 text-white"
+                  onClick={handleUnpublish}
+                  disabled={publishing}
+                >
+                  {publishing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <GlobeIcon className="h-4 w-4" />
+                  )}
+                  Unpublish
+                </Button>
+              </>
+            )}
+
+            {post.status.published.color === "green" && (
+              <Button
+                variant="default"
+                className="gap-2 bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleUnpublish}
+                disabled={publishing}
+              >
+                {publishing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <GlobeIcon className="h-4 w-4" />
+                )}
+                Unpublish
               </Button>
             )}
           </div>
