@@ -748,19 +748,71 @@ export default function PostDetailPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-display text-lg font-semibold">Header Picture</h2>
             {hasSource && (
-              <Button
-                size="sm"
-                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={handleGenerateImage}
-                disabled={!!generatingImage}
-              >
-                {generatingImage === "image" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ImageIcon className="h-3.5 w-3.5" />
-                )}
-                Generate Picture
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={async () => {
+                    setImagePrompt("");
+                    setGeneratedImageBase64(null);
+                    // Regenerate prompt, then immediately generate the image
+                    setGeneratingImage("prompt");
+                    try {
+                      const promptRes = await fetch("/api/ai/generate-image", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "prompt",
+                          sourceRaw: post?.sourceRaw,
+                          sourceSummarized: post?.sourceSummarized,
+                          hint: transientPromptHint || undefined,
+                          modelId: transientModel || undefined,
+                        }),
+                      });
+                      const promptData = await promptRes.json();
+                      if (!promptRes.ok) throw new Error(promptData.error || "Failed to generate prompt");
+                      setImagePrompt(promptData.imagePrompt);
+
+                      // Now generate the image with the new prompt
+                      setGeneratingImage("image");
+                      const imgRes = await fetch("/api/ai/generate-image", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "image", dallePrompt: promptData.imagePrompt }),
+                      });
+                      const imgData = await imgRes.json();
+                      if (!imgRes.ok) throw new Error(imgData.error || "Image generation failed");
+                      setGeneratedImageBase64(imgData.base64);
+                      toast({ title: "Header image regenerated", description: "Image will be uploaded when you save." });
+                    } catch (error: any) {
+                      toast({ title: "Generation failed", description: error.message, variant: "destructive" });
+                    } finally {
+                      setGeneratingImage(null);
+                    }
+                  }}
+                  disabled={!!generatingImage}
+                >
+                  {generatingImage === "prompt" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  Start Over
+                </Button>
+                <Button
+                  size="sm"
+                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={handleGenerateImage}
+                  disabled={!!generatingImage}
+                >
+                  {generatingImage === "image" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ImageIcon className="h-3.5 w-3.5" />
+                  )}
+                  Generate Picture
+                </Button>
+              </div>
             )}
           </div>
 
@@ -902,187 +954,7 @@ export default function PostDetailPage() {
 
       {/* ═══ RIGHT COLUMN: Meta ═══ */}
       <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-        {/* 1. Meta Fields (Collapsible) */}
-        <Collapsible open={showMetaFields} onOpenChange={setShowMetaFields}>
-          <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3 animate-fade-in">
-            <CollapsibleTrigger asChild>
-              <button className="flex items-center justify-between w-full hover:opacity-80 transition-opacity text-left">
-                <div className="flex items-center gap-2">
-                  <PenLine className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-sm">Meta Fields</span>
-                </div>
-                {showMetaFields ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
-            </CollapsibleTrigger>
-
-            <CollapsibleContent>
-              <div className="space-y-3 pt-2">
-                {/* Slug */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="slug" className="text-xs text-muted-foreground">Slug</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        id="slug"
-                        value={slugValue}
-                        onChange={(e) => setSlugValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                        placeholder="url-slug"
-                        className="bg-secondary/50 pr-20"
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                        {form.pagetitle && slugValue !== deriveSlug(form.pagetitle) && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => setSlugValue(deriveSlug(form.pagetitle))}
-                            title="Generate from title"
-                          >
-                            <Wand2 className="h-3 w-3 text-blue-500" />
-                          </Button>
-                        )}
-                        {slugValue !== originalSlug && originalSlug && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => setSlugValue(originalSlug)}
-                            title="Reset to original"
-                          >
-                            <RotateCcw className="h-3 w-3 text-muted-foreground" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {slugValue !== originalSlug && slugValue && (
-                    <p className="text-xs text-primary">
-                      Slug will change to: {slugValue}
-                    </p>
-                  )}
-                </div>
-
-                <FieldWithAI
-                  label="Page Title"
-                  id="pagetitle"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("pagetitle")}
-                >
-                  <Input
-                    id="pagetitle"
-                    value={form.pagetitle}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, pagetitle: e.target.value }))
-                    }
-                    placeholder="Blog post title"
-                  />
-                </FieldWithAI>
-
-                <FieldWithAI
-                  label="Page Intro"
-                  id="pageintro"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("pageintro")}
-                >
-                  <Textarea
-                    id="pageintro"
-                    value={form.pageintro}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, pageintro: e.target.value }))
-                    }
-                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
-                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-                    placeholder="Introduction text"
-                    rows={1}
-                    className="resize-none overflow-hidden"
-                  />
-                </FieldWithAI>
-
-                <FieldWithAI
-                  label="Teaser Title"
-                  id="teasertitle"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("teasertitle")}
-                >
-                  <Input
-                    id="teasertitle"
-                    value={form.teasertitle}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, teasertitle: e.target.value }))
-                    }
-                    placeholder="Teaser title for previews"
-                  />
-                </FieldWithAI>
-
-                <FieldWithAI
-                  label="Abstract"
-                  id="abstract"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("abstract")}
-                >
-                  <Textarea
-                    id="abstract"
-                    value={form.abstract}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, abstract: e.target.value }))
-                    }
-                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
-                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-                    placeholder="Short summary / teaser text"
-                    rows={1}
-                    className="resize-none overflow-hidden"
-                  />
-                </FieldWithAI>
-
-                <FieldWithAI
-                  label="Read More Text"
-                  id="readmoretext"
-                  generating={generating}
-                  onGenerate={() => handleGenerate("readmoretext")}
-                >
-                  <Input
-                    id="readmoretext"
-                    value={form.readmoretext}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        readmoretext: e.target.value,
-                      }))
-                    }
-                    placeholder="Call to action text"
-                  />
-                </FieldWithAI>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="date" className="text-xs">Date</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={form.date}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, date: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-            </CollapsibleContent>
-          </div>
-        </Collapsible>
-
-        {/* 2. Status (compact one-line) */}
-        <div className="rounded-lg border border-border/50 bg-card px-4 py-3 animate-fade-in">
-          <div className="flex items-center gap-4 text-xs">
-            <StatusDot label="Content" color={post.status.contentComplete.color} />
-            <StatusDot label="Published" color={post.status.published.color} />
-            <StatusDot label="Publer" color={post.status.publishedPubler.color} />
-          </div>
-        </div>
-
-        {/* 3. AI Settings (Collapsible) */}
+        {/* 1. AI Settings (Collapsible) */}
         <Collapsible open={showAiSettings} onOpenChange={setShowAiSettings}>
           <div className="rounded-lg border border-blue-500/30 bg-card p-4 space-y-3 animate-fade-in">
             <CollapsibleTrigger asChild>
@@ -1264,6 +1136,186 @@ export default function PostDetailPage() {
             )}
           </div>
         </Collapsible>
+
+        {/* 2. Meta Fields (Collapsible) */}
+        <Collapsible open={showMetaFields} onOpenChange={setShowMetaFields}>
+          <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3 animate-fade-in">
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center justify-between w-full hover:opacity-80 transition-opacity text-left">
+                <div className="flex items-center gap-2">
+                  <PenLine className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">Meta Fields</span>
+                </div>
+                {showMetaFields ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent>
+              <div className="space-y-3 pt-2">
+                {/* Slug */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="slug" className="text-xs text-muted-foreground">Slug</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="slug"
+                        value={slugValue}
+                        onChange={(e) => setSlugValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                        placeholder="url-slug"
+                        className="bg-secondary/50 pr-20"
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                        {form.pagetitle && slugValue !== deriveSlug(form.pagetitle) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => setSlugValue(deriveSlug(form.pagetitle))}
+                            title="Generate from title"
+                          >
+                            <Wand2 className="h-3 w-3 text-blue-500" />
+                          </Button>
+                        )}
+                        {slugValue !== originalSlug && originalSlug && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => setSlugValue(originalSlug)}
+                            title="Reset to original"
+                          >
+                            <RotateCcw className="h-3 w-3 text-muted-foreground" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {slugValue !== originalSlug && slugValue && (
+                    <p className="text-xs text-primary">
+                      Slug will change to: {slugValue}
+                    </p>
+                  )}
+                </div>
+
+                <FieldWithAI
+                  label="Page Title"
+                  id="pagetitle"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("pagetitle")}
+                >
+                  <Input
+                    id="pagetitle"
+                    value={form.pagetitle}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, pagetitle: e.target.value }))
+                    }
+                    placeholder="Blog post title"
+                  />
+                </FieldWithAI>
+
+                <FieldWithAI
+                  label="Page Intro"
+                  id="pageintro"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("pageintro")}
+                >
+                  <Textarea
+                    id="pageintro"
+                    value={form.pageintro}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, pageintro: e.target.value }))
+                    }
+                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                    placeholder="Introduction text"
+                    rows={1}
+                    className="resize-none overflow-hidden"
+                  />
+                </FieldWithAI>
+
+                <FieldWithAI
+                  label="Teaser Title"
+                  id="teasertitle"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("teasertitle")}
+                >
+                  <Input
+                    id="teasertitle"
+                    value={form.teasertitle}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, teasertitle: e.target.value }))
+                    }
+                    placeholder="Teaser title for previews"
+                  />
+                </FieldWithAI>
+
+                <FieldWithAI
+                  label="Abstract"
+                  id="abstract"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("abstract")}
+                >
+                  <Textarea
+                    id="abstract"
+                    value={form.abstract}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, abstract: e.target.value }))
+                    }
+                    onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }}
+                    ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                    placeholder="Short summary / teaser text"
+                    rows={1}
+                    className="resize-none overflow-hidden"
+                  />
+                </FieldWithAI>
+
+                <FieldWithAI
+                  label="Read More Text"
+                  id="readmoretext"
+                  generating={generating}
+                  onGenerate={() => handleGenerate("readmoretext")}
+                >
+                  <Input
+                    id="readmoretext"
+                    value={form.readmoretext}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        readmoretext: e.target.value,
+                      }))
+                    }
+                    placeholder="Call to action text"
+                  />
+                </FieldWithAI>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="date" className="text-xs">Date</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={form.date}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, date: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+
+        {/* 3. Status (compact one-line) */}
+        <div className="rounded-lg border border-border/50 bg-card px-4 py-3 animate-fade-in">
+          <div className="flex items-center gap-4 text-xs">
+            <StatusDot label="Content" color={post.status.contentComplete.color} />
+            <StatusDot label="Published" color={post.status.published.color} />
+            <StatusDot label="Publer" color={post.status.publishedPubler.color} />
+          </div>
+        </div>
 
         {/* 4. Source Material */}
         {hasSource && (
