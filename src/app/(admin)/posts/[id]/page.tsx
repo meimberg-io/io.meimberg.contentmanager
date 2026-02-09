@@ -128,6 +128,9 @@ export default function PostDetailPage() {
   const [editSummaryOpen, setEditSummaryOpen] = useState(false);
   const [editSummaryText, setEditSummaryText] = useState("");
 
+  // Generate All progress
+  const [generateAllProgress, setGenerateAllProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+
   // Optimize dialog
   const [optimizeOpen, setOptimizeOpen] = useState(false);
   const [optimizeInstruction, setOptimizeInstruction] = useState("");
@@ -504,14 +507,29 @@ export default function PostDetailPage() {
 
   const handleGenerateAll = async () => {
     if (!post) return;
-    // Fire all individual generators in parallel, each using its own prompt
-    const metaFields = ["pagetitle", "pageintro", "teasertitle", "abstract", "readmoretext"] as const;
-    const tasks: Promise<void>[] = metaFields.map((field) => handleGenerate(field));
-    tasks.push(handleGenerateBody());
+
+    const steps: { key: string; label: string; fn: () => Promise<void> }[] = [
+      { key: "pagetitle", label: "Page Title", fn: () => handleGenerate("pagetitle") },
+      { key: "pageintro", label: "Page Intro", fn: () => handleGenerate("pageintro") },
+      { key: "teasertitle", label: "Teaser Title", fn: () => handleGenerate("teasertitle") },
+      { key: "abstract", label: "Abstract", fn: () => handleGenerate("abstract") },
+      { key: "readmoretext", label: "Read More Text", fn: () => handleGenerate("readmoretext") },
+      { key: "body", label: "Article Body", fn: () => handleGenerateBody() },
+    ];
     if (post.sourceRaw || post.sourceSummarized) {
-      tasks.push(handleGenerateImagePrompt());
+      steps.push({ key: "imagePrompt", label: "Image Prompt", fn: () => handleGenerateImagePrompt() });
     }
-    await Promise.allSettled(tasks);
+
+    const total = steps.length;
+    for (let i = 0; i < steps.length; i++) {
+      setGenerateAllProgress({ current: i, total, label: steps[i].label });
+      try {
+        await steps[i].fn();
+      } catch {
+        // individual handlers already toast errors
+      }
+    }
+    setGenerateAllProgress(null);
   };
 
   // ─── Optimize Body Text ──────────────────────────────────────
@@ -1119,20 +1137,36 @@ export default function PostDetailPage() {
 
             {/* Generate All button - always visible */}
             {hasSource && (
-              <Button
-                size="sm"
-                variant="default"
-                className="w-full gap-1.5 mt-2 bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => handleGenerateAll()}
-                disabled={generating.size > 0}
-              >
-                {generating.size > 0 ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
+              <div className="mt-2 space-y-2">
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="w-full gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => handleGenerateAll()}
+                  disabled={generating.size > 0 || !!generateAllProgress}
+                >
+                  {generateAllProgress ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Generate All from Source
+                </Button>
+                {generateAllProgress && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{generateAllProgress.label}...</span>
+                      <span>{generateAllProgress.current + 1}/{generateAllProgress.total}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-secondary/50 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                        style={{ width: `${((generateAllProgress.current + 1) / generateAllProgress.total) * 100}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
-                Generate All from Source
-              </Button>
+              </div>
             )}
           </div>
         </Collapsible>

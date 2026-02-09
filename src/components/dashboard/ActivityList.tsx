@@ -38,10 +38,11 @@ export function ActivityList({ activities }: ActivityListProps) {
   return (
     <div className="space-y-3">
       {activities.map((activity, index) => (
-        <div
+        <Link
           key={activity.id}
+          href={`/posts/${activity.postId}`}
           className={cn(
-            "flex items-center gap-4 rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary/30 hover:bg-card/80",
+            "flex items-center gap-4 rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary/30 hover:bg-card/80 cursor-pointer",
             "animate-slide-up"
           )}
           style={{ animationDelay: `${index * 50}ms` }}
@@ -58,7 +59,7 @@ export function ActivityList({ activities }: ActivityListProps) {
               {getStatusIcon(activity.status)}
             </div>
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   );
