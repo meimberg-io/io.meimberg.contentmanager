@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
@@ -21,11 +21,21 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// ─── Editor Registry ─────────────────────────────────────────
+// Module-level map so the parent page can access TipTap editor instances by block UID.
+const editorRegistry = new Map<string, Editor>();
+
+/** Get the TipTap editor instance for a richtext block by its UID */
+export function getRichtextEditor(uid: string): Editor | undefined {
+  return editorRegistry.get(uid);
+}
+
 interface RichtextBlockProps {
   data: {
     content?: any; // Storyblok richtext document
   };
   onChange: (data: any) => void;
+  blockUid?: string; // Used to register the editor in the registry
 }
 
 /**
@@ -83,7 +93,7 @@ function tiptapToStoryblok(doc: any): any {
   return convertNodeTypes(doc, TIPTAP_TO_SB_TYPES);
 }
 
-export function RichtextBlock({ data, onChange }: RichtextBlockProps) {
+export function RichtextBlock({ data, onChange, blockUid }: RichtextBlockProps) {
   const initialContent = useRef(storyblokToTiptap(data.content));
   const suppressUpdate = useRef(false);
 
@@ -116,6 +126,13 @@ export function RichtextBlock({ data, onChange }: RichtextBlockProps) {
       onChange({ ...data, content: tiptapToStoryblok(json) });
     },
   });
+
+  // Register / unregister in the module-level editor registry
+  useEffect(() => {
+    if (!editor || !blockUid) return;
+    editorRegistry.set(blockUid, editor);
+    return () => { editorRegistry.delete(blockUid); };
+  }, [editor, blockUid]);
 
   // Sync external content changes (e.g. from AI generation)
   useEffect(() => {

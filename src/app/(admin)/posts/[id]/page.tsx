@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { BlogPost } from "@/types";
@@ -71,6 +71,8 @@ function deriveSlug(title: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+import { getRichtextEditor } from "@/components/blocks/RichtextBlock";
+
 // Dynamic import BodyEditor to avoid SSR issues with dnd-kit/tiptap
 const BodyEditor = dynamic(
   () => import("@/components/blocks/BodyEditor").then((m) => m.BodyEditor),
@@ -125,6 +127,13 @@ export default function PostDetailPage() {
   // Source edit dialog
   const [editSummaryOpen, setEditSummaryOpen] = useState(false);
   const [editSummaryText, setEditSummaryText] = useState("");
+
+  // Optimize dialog
+  const [optimizeOpen, setOptimizeOpen] = useState(false);
+  const [optimizeInstruction, setOptimizeInstruction] = useState("");
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizeSnapshot, setOptimizeSnapshot] = useState<{ blockUid: string; content: any } | null>(null);
+  const optimizeJustApplied = useRef(false);
 
   // Slug
   const [slugValue, setSlugValue] = useState("");
@@ -239,6 +248,17 @@ export default function PostDetailPage() {
     return () => { cancelled = true; };
   }, [post?.storyblokId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clear optimize snapshot on manual edits to the body
+  useEffect(() => {
+    if (optimizeJustApplied.current) {
+      optimizeJustApplied.current = false;
+      return;
+    }
+    if (optimizeSnapshot) {
+      setOptimizeSnapshot(null);
+    }
+  }, [bodyBlocks]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ─── Handlers ───────────────────────────────────────────────
 
   const handleSave = async () => {
@@ -283,6 +303,7 @@ export default function PostDetailPage() {
       }
 
       toast({ title: "Saved successfully" });
+      setOptimizeSnapshot(null);
       await loadPost();
     } catch (error: any) {
       toast({
@@ -493,6 +514,91 @@ export default function PostDetailPage() {
     await Promise.allSettled(tasks);
   };
 
+  // ─── Optimize Body Text ──────────────────────────────────────
+
+  const handleOptimize = async () => {
+    if (!optimizeInstruction.trim()) return;
+
+    // Find the first richtext block
+    const firstRichtext = bodyBlocks.find((b) => b.component === "richtext");
+    if (!firstRichtext) {
+      toast({ title: "No richtext block found", variant: "destructive" });
+      return;
+    }
+
+    const editor = getRichtextEditor(firstRichtext._uid);
+    if (!editor) {
+      toast({ title: "Editor not available", variant: "destructive" });
+      return;
+    }
+
+    // Check for selection
+    const { from, to, empty } = editor.state.selection;
+    const hasSelection = !empty;
+
+    let textToOptimize: string;
+    if (hasSelection) {
+      textToOptimize = editor.state.doc.textBetween(from, to, "\n");
+    } else {
+      textToOptimize = editor.getText({ blockSeparator: "\n" });
+    }
+
+    if (!textToOptimize.trim()) {
+      toast({ title: "No text to optimize", variant: "destructive" });
+      return;
+    }
+
+    // Store snapshot for revert
+    const snapshotContent = editor.getJSON();
+
+    setOptimizing(true);
+    try {
+      const response = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "optimize",
+          text: textToOptimize,
+          instruction: optimizeInstruction.trim(),
+          isFullDocument: !hasSelection,
+          modelId: transientModel || undefined,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Optimization failed");
+
+      optimizeJustApplied.current = true;
+      setOptimizeSnapshot({ blockUid: firstRichtext._uid, content: snapshotContent });
+
+      if (hasSelection && data.optimizedText) {
+        // Replace selection with optimized plain text
+        editor.chain().focus().deleteRange({ from, to }).insertContentAt(from, data.optimizedText).run();
+      } else if (!hasSelection && data.bodyContent) {
+        // Replace the entire editor content with the new ProseMirror JSON
+        editor.commands.setContent(data.bodyContent);
+      }
+
+      toast({ title: "Text optimized", description: hasSelection ? "Selection replaced" : "Full text replaced" });
+      setOptimizeOpen(false);
+      setOptimizeInstruction("");
+    } catch (error: any) {
+      toast({ title: "Optimization failed", description: error.message, variant: "destructive" });
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  const handleRevertOptimize = () => {
+    if (!optimizeSnapshot) return;
+    const editor = getRichtextEditor(optimizeSnapshot.blockUid);
+    if (!editor) return;
+    optimizeJustApplied.current = true;
+    editor.commands.setContent(optimizeSnapshot.content);
+    setOptimizeSnapshot(null);
+    toast({ title: "Optimization reverted" });
+  };
+
   // ─── Header Image Generation ────────────────────────────────
 
   const handleGenerateImagePrompt = async () => {
@@ -688,27 +794,47 @@ export default function PostDetailPage() {
         {/* Body Editor */}
         <div className="animate-fade-in" style={{ animationDelay: "100ms" }}>
           {/* Generate Body Button */}
-          {hasSource && (
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-display text-lg font-semibold">Body Content</h2>
-              <Button
-                size="sm"
-                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => handleGenerateBody()}
-                disabled={generating.has("body")}
-              >
-                {generating.has("body") ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                Generate Article
-              </Button>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-lg font-semibold">Body Content</h2>
+            <div className="flex items-center gap-2">
+              {optimizeSnapshot && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleRevertOptimize}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Revert
+                </Button>
+              )}
+              {bodyBlocks.some((b) => b.component === "richtext") && (
+                <Button
+                  size="sm"
+                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => setOptimizeOpen(true)}
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Optimize
+                </Button>
+              )}
+              {hasSource && (
+                <Button
+                  size="sm"
+                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => handleGenerateBody()}
+                  disabled={generating.has("body")}
+                >
+                  {generating.has("body") ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Generate Article
+                </Button>
+              )}
             </div>
-          )}
-          {!hasSource && (
-            <h2 className="font-display text-lg font-semibold mb-3">Body Content</h2>
-          )}
+          </div>
           <BodyEditor blocks={bodyBlocks} onChange={setBodyBlocks} />
         </div>
 
@@ -1200,6 +1326,50 @@ export default function PostDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Optimize Text Dialog */}
+      <Dialog open={optimizeOpen} onOpenChange={setOptimizeOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Optimize Text</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {(() => {
+              const firstRichtext = bodyBlocks.find((b) => b.component === "richtext");
+              if (!firstRichtext) return "No richtext block found.";
+              const editor = getRichtextEditor(firstRichtext._uid);
+              if (editor && !editor.state.selection.empty) {
+                return "A text selection was detected. Only the selected text will be optimized.";
+              }
+              return "No selection detected. The entire first richtext block will be optimized.";
+            })()}
+          </p>
+          <Textarea
+            value={optimizeInstruction}
+            onChange={(e) => setOptimizeInstruction(e.target.value)}
+            placeholder="E.g. 'Make it more casual', 'Fix grammar', 'Shorten by half', 'Translate to English'..."
+            className="min-h-[120px]"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOptimizeOpen(false)} disabled={optimizing}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleOptimize}
+              disabled={optimizing || !optimizeInstruction.trim()}
+              className="gap-2"
+            >
+              {optimizing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Wand2 className="h-4 w-4" />
+              )}
+              Optimize
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Summary Dialog */}
       <Dialog open={editSummaryOpen} onOpenChange={setEditSummaryOpen}>
