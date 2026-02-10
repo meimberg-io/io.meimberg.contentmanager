@@ -1143,28 +1143,30 @@ export default function PostDetailPage() {
               }
               color={post.status.contentComplete.color}
             />
-            {post.status.contentComplete.completed ? (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-yellow-500 hover:bg-yellow-600 hover:text-white"
-                onClick={handleToggleContentComplete}
-                disabled={saving}
-                title="Mark incomplete"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertCircle className="h-4 w-4" />}
-              </Button>
-            ) : (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-green-500 hover:bg-green-600 hover:text-white"
-                onClick={handleToggleContentComplete}
-                disabled={saving}
-                title="Mark complete"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-              </Button>
+            {post.status.contentComplete.color !== "red" && (
+              post.status.contentComplete.completed ? (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-yellow-500 hover:bg-yellow-600 hover:text-white"
+                  onClick={handleToggleContentComplete}
+                  disabled={saving}
+                  title="Mark incomplete"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertCircle className="h-4 w-4" />}
+                </Button>
+              ) : (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-green-500 hover:bg-green-600 hover:text-white"
+                  onClick={handleToggleContentComplete}
+                  disabled={saving}
+                  title="Mark complete"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                </Button>
+              )
             )}
           </div>
 
