@@ -36,7 +36,7 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="font-display text-3xl font-bold tracking-tight">
-              meimberg.io Contentmanager
+              Blogmanager
             </h1>
             <p className="text-muted-foreground mt-2">
               Manage Your Blog Content

@@ -63,14 +63,14 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="flex items-center gap-8">
             <Link href="/dashboard" className="flex items-center gap-3 hover-lift">
               <Image
-                src="/avatar.png"
+                src="/apple-touch-icon.png"
                 alt="meimberg.io"
                 width={36}
                 height={36}
                 className="h-9 w-9 rounded-lg"
               />
               <span className="hidden font-display text-xl font-semibold tracking-tight sm:block">
-                meimberg.io Contentmanager
+                Blogmanager
               </span>
             </Link>
 
