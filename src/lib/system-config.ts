@@ -12,6 +12,10 @@ const SYSTEM_STORY_SLUG = 'system'
 // Cache story ID to avoid repeated lookups
 let cachedStoryId: number | null = null
 
+// Cache full config with TTL to avoid repeated Storyblok requests
+let cachedConfig: { data: SystemConfig; expiresAt: number } | null = null
+const CONFIG_CACHE_TTL_MS = 30_000 // 30 seconds
+
 export interface SystemConfig {
   [key: string]: any
   settings?: any
@@ -82,11 +86,16 @@ async function getSystemStoryId(): Promise<number | null> {
 }
 
 /**
- * Get the current system config
+ * Get the current system config (with in-memory TTL cache to avoid redundant Storyblok calls)
  */
 export async function getSystemConfig(): Promise<SystemConfig> {
   if (!MANAGEMENT_TOKEN) {
     return {}
+  }
+
+  // Return cached config if still fresh
+  if (cachedConfig && Date.now() < cachedConfig.expiresAt) {
+    return cachedConfig.data
   }
 
   try {
@@ -114,11 +123,14 @@ export async function getSystemConfig(): Promise<SystemConfig> {
     const configString = content.config || '{}'
 
     if (!configString || configString.trim() === '') {
+      cachedConfig = { data: {}, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS }
       return {}
     }
 
     try {
-      return JSON.parse(configString)
+      const parsed = JSON.parse(configString)
+      cachedConfig = { data: parsed, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS }
+      return parsed
     } catch (error) {
       console.error('Failed to parse system config:', error)
       return {}
@@ -133,6 +145,9 @@ export async function getSystemConfig(): Promise<SystemConfig> {
  * Update the system config
  */
 export async function updateSystemConfig(updates: Partial<SystemConfig>): Promise<SystemConfig> {
+  // Invalidate cache so next read picks up the new values
+  cachedConfig = null
+
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
   }

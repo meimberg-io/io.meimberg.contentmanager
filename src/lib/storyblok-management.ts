@@ -322,7 +322,9 @@ async function getPostById(storyId: string) {
   )
 
   if (!response.ok) {
-    throw new Error('Failed to fetch story')
+    const errorBody = await response.text().catch(() => '')
+    console.error(`[getPostById] Storyblok ${response.status} for story ${storyId}:`, errorBody)
+    throw new Error(`Failed to fetch story (${response.status}): ${errorBody || response.statusText}`)
   }
 
   const data = await response.json()
@@ -330,14 +332,14 @@ async function getPostById(storyId: string) {
 }
 
 /**
- * Fetch a single blog post by slug via Management API (includes full content + publish status)
+ * Fetch a single blog post by slug via Management API (includes full content + publish status).
+ * Uses a single API call — the Management API list endpoint returns full story content.
  */
 export async function fetchSinglePostManagement(slug: string) {
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
   }
 
-  // Search by full slug (folder/slug)
   const response = await fetch(
     `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?by_slugs=b/${slug}`,
     {
@@ -349,19 +351,12 @@ export async function fetchSinglePostManagement(slug: string) {
   )
 
   if (!response.ok) {
-    throw new Error(`Failed to search for post: ${response.statusText}`)
+    const errorBody = await response.text().catch(() => '')
+    throw new Error(`Failed to fetch post (${response.status}): ${errorBody || response.statusText}`)
   }
 
   const data = await response.json()
-  const story = (data.stories || [])[0]
-  
-  if (!story) {
-    return null
-  }
-
-  // Fetch full story by ID (list endpoint may not include content)
-  const fullStory = await getPostById(String(story.id))
-  return fullStory
+  return (data.stories || [])[0] || null
 }
 
 /**
