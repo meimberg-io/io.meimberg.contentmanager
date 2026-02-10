@@ -333,13 +333,15 @@ async function getPostById(storyId: string) {
 
 /**
  * Fetch a single blog post by slug via Management API (includes full content + publish status).
- * Uses a single API call — the Management API list endpoint returns full story content.
+ * Two-step: resolve slug → ID via list endpoint, then fetch full story by ID.
+ * The list endpoint does not return full nested content (e.g. body blocks).
  */
 export async function fetchSinglePostManagement(slug: string) {
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
   }
 
+  // Step 1: resolve slug to story ID
   const response = await fetch(
     `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?by_slugs=b/${slug}`,
     {
@@ -356,7 +358,14 @@ export async function fetchSinglePostManagement(slug: string) {
   }
 
   const data = await response.json()
-  return (data.stories || [])[0] || null
+  const story = (data.stories || [])[0]
+
+  if (!story) {
+    return null
+  }
+
+  // Step 2: fetch full story with content by ID
+  return await getPostById(String(story.id))
 }
 
 /**
