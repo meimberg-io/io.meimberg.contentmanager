@@ -1170,7 +1170,7 @@ export default function PostDetailPage() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 text-yellow-500 hover:bg-yellow-600 hover:text-white"
+                  className="h-7 w-7 text-muted-foreground/50 hover:bg-yellow-600 hover:text-white"
                   onClick={handleToggleContentComplete}
                   disabled={saving}
                   title="Mark incomplete"
@@ -1181,7 +1181,7 @@ export default function PostDetailPage() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 text-green-500 hover:bg-green-600 hover:text-white"
+                  className="h-7 w-7 text-muted-foreground/50 hover:bg-green-600 hover:text-white"
                   onClick={handleToggleContentComplete}
                   disabled={saving}
                   title="Mark complete"
@@ -1209,7 +1209,7 @@ export default function PostDetailPage() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 text-green-500 hover:bg-green-600 hover:text-white"
+                  className="h-7 w-7 text-muted-foreground/50 hover:bg-green-600 hover:text-white"
                   onClick={handlePublish}
                   disabled={publishing}
                   title="Publish"
@@ -1222,7 +1222,7 @@ export default function PostDetailPage() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-7 w-7 text-green-500 hover:bg-green-600 hover:text-white"
+                    className="h-7 w-7 text-muted-foreground/50 hover:bg-green-600 hover:text-white"
                     onClick={handlePublish}
                     disabled={publishing}
                     title="Publish changes"
@@ -1232,7 +1232,7 @@ export default function PostDetailPage() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-7 w-7 text-red-500 hover:bg-red-600 hover:text-white"
+                    className="h-7 w-7 text-muted-foreground/50 hover:bg-red-600 hover:text-white"
                     onClick={handleUnpublish}
                     disabled={publishing}
                     title="Unpublish"
@@ -1245,7 +1245,7 @@ export default function PostDetailPage() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 text-red-500 hover:bg-red-600 hover:text-white"
+                  className="h-7 w-7 text-muted-foreground/50 hover:bg-red-600 hover:text-white"
                   onClick={handleUnpublish}
                   disabled={publishing}
                   title="Unpublish"
