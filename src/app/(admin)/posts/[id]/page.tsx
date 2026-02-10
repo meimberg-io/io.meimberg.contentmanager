@@ -32,6 +32,8 @@ import {
   GlobeIcon,
   CheckCircle,
   XCircle,
+  AlertCircle,
+  Circle,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -908,99 +910,7 @@ export default function PostDetailPage() {
           <BodyEditor blocks={bodyBlocks} onChange={setBodyBlocks} />
         </div>
 
-        {/* Actions */}
-        <div
-          className="flex items-center justify-between pt-4 border-t border-border/50 animate-fade-in"
-          style={{ animationDelay: "150ms" }}
-        >
-          {/* Content Complete Toggle */}
-          <Button
-            variant={
-              post.status.contentComplete.completed ? "secondary" : "outline"
-            }
-            className="gap-2"
-            onClick={handleToggleContentComplete}
-            disabled={saving}
-          >
-            {post.status.contentComplete.completed ? (
-              <>
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Content Complete
-              </>
-            ) : (
-              <>
-                <XCircle className="h-4 w-4 text-muted-foreground" />
-                Mark as Complete
-              </>
-            )}
-          </Button>
-
-          {/* Publish Controls */}
-          <div className="flex items-center gap-2">
-            {post.status.published.color === "red" && (
-              <Button
-                variant="default"
-                className="gap-2"
-                onClick={handlePublish}
-                disabled={publishing}
-              >
-                {publishing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Globe className="h-4 w-4" />
-                )}
-                Publish initially
-              </Button>
-            )}
-
-            {post.status.published.color === "yellow" && (
-              <>
-                <Button
-                  variant="default"
-                  className="gap-2"
-                  onClick={handlePublish}
-                  disabled={publishing}
-                >
-                  {publishing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Globe className="h-4 w-4" />
-                  )}
-                  Publish changes
-                </Button>
-                <Button
-                  variant="default"
-                  className="gap-2 bg-red-600 hover:bg-red-700 text-white"
-                  onClick={handleUnpublish}
-                  disabled={publishing}
-                >
-                  {publishing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <GlobeIcon className="h-4 w-4" />
-                  )}
-                  Unpublish
-                </Button>
-              </>
-            )}
-
-            {post.status.published.color === "green" && (
-              <Button
-                variant="default"
-                className="gap-2 bg-red-600 hover:bg-red-700 text-white"
-                onClick={handleUnpublish}
-                disabled={publishing}
-              >
-                {publishing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <GlobeIcon className="h-4 w-4" />
-                )}
-                Unpublish
-              </Button>
-            )}
-          </div>
-        </div>
+        {/* Actions moved to sidebar Status panel */}
       </div>
 
       {/* ═══ RIGHT COLUMN: Meta ═══ */}
@@ -1204,7 +1114,113 @@ export default function PostDetailPage() {
           </div>
         </Collapsible>
 
-        {/* 2. Meta Fields (Collapsible) */}
+        {/* 2. Status & Actions */}
+        <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-sm">Status</span>
+          </div>
+          {/* Content — button color = target state */}
+          <div className="flex items-center justify-between">
+            <StatusDot
+              label={
+                post.status.contentComplete.color === "green"
+                  ? "Content complete"
+                  : "Content incomplete"
+              }
+              color={post.status.contentComplete.color}
+            />
+            {post.status.contentComplete.completed ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-yellow-500 hover:bg-yellow-600 hover:text-white"
+                onClick={handleToggleContentComplete}
+                disabled={saving}
+                title="Mark incomplete"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertCircle className="h-4 w-4" />}
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-green-500 hover:bg-green-600 hover:text-white"
+                onClick={handleToggleContentComplete}
+                disabled={saving}
+                title="Mark complete"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+              </Button>
+            )}
+          </div>
+
+          {/* Published — green = publish (positive), red = unpublish (destructive) */}
+          <div className="flex items-center justify-between">
+            <StatusDot
+              label={
+                post.status.published.color === "red"
+                  ? "Not published"
+                  : post.status.published.color === "yellow"
+                    ? "Unpublished changes"
+                    : "Published"
+              }
+              color={post.status.published.color}
+            />
+            <div className="flex items-center gap-1.5">
+              {post.status.published.color === "red" && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-green-500 hover:bg-green-600 hover:text-white"
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  title="Publish"
+                >
+                  {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                </Button>
+              )}
+              {post.status.published.color === "yellow" && (
+                <>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-green-500 hover:bg-green-600 hover:text-white"
+                    onClick={handlePublish}
+                    disabled={publishing}
+                    title="Publish changes"
+                  >
+                    {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-red-500 hover:bg-red-600 hover:text-white"
+                    onClick={handleUnpublish}
+                    disabled={publishing}
+                    title="Unpublish"
+                  >
+                    {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                  </Button>
+                </>
+              )}
+              {post.status.published.color === "green" && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-red-500 hover:bg-red-600 hover:text-white"
+                  onClick={handleUnpublish}
+                  disabled={publishing}
+                  title="Unpublish"
+                >
+                  {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Meta Fields (Collapsible) */}
         <Collapsible open={showMetaFields} onOpenChange={setShowMetaFields}>
           <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3 animate-fade-in">
             <CollapsibleTrigger asChild>
@@ -1374,15 +1390,6 @@ export default function PostDetailPage() {
             </CollapsibleContent>
           </div>
         </Collapsible>
-
-        {/* 3. Status (compact one-line) */}
-        <div className="rounded-lg border border-border/50 bg-card px-4 py-3 animate-fade-in">
-          <div className="flex items-center gap-4 text-xs">
-            <StatusDot label="Content" color={post.status.contentComplete.color} />
-            <StatusDot label="Published" color={post.status.published.color} />
-            <StatusDot label="Publer" color={post.status.publishedPubler.color} />
-          </div>
-        </div>
 
         {/* 4. Source Material */}
         {hasSource && (
@@ -1580,19 +1587,39 @@ function FieldWithAI({
 }
 
 function StatusDot({ label, color }: { label: string; color: string }) {
-  const dotColor =
+  const bgColor =
     color === "green"
-      ? "bg-green-500"
+      ? "bg-green-500/15"
       : color === "yellow"
-        ? "bg-yellow-500"
+        ? "bg-yellow-500/15"
         : color === "red"
-          ? "bg-red-500"
-          : "bg-gray-400";
+          ? "bg-red-500/15"
+          : "bg-gray-500/15";
+
+  const iconColor =
+    color === "green"
+      ? "text-green-500"
+      : color === "yellow"
+        ? "text-yellow-500"
+        : color === "red"
+          ? "text-red-500"
+          : "text-gray-400";
+
+  const Icon =
+    color === "green"
+      ? CheckCircle
+      : color === "yellow"
+        ? AlertCircle
+        : color === "red"
+          ? XCircle
+          : Circle;
 
   return (
-    <div className="flex items-center gap-1.5">
-      <div className={cn("h-2 w-2 rounded-full", dotColor)} />
-      <span className="text-muted-foreground">{label}</span>
+    <div className="flex items-center gap-2">
+      <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", bgColor)}>
+        <Icon className={cn("h-5 w-5", iconColor)} />
+      </div>
+      <span className="text-xs text-muted-foreground">{label}</span>
     </div>
   );
 }
