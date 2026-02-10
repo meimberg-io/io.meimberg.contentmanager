@@ -711,7 +711,7 @@ export default function PostDetailPage() {
 
   // ─── Rendering ──────────────────────────────────────────────
 
-  if (loading) {
+  if (loading && !post) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-4">
