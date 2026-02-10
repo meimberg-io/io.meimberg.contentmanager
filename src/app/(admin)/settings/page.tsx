@@ -30,19 +30,6 @@ const DEFAULT_PROMPTS: Record<string, string> = {
   teasertitle: `Basierend auf dem Quellmaterial, generiere einen kurzen Teaser-Titel. Dieser wird als Überschrift in der Vorschau / Teaser-Karte angezeigt. Maximal 60 Zeichen. Gib NUR den Titel zurück. Sprache: Deutsch.`,
   abstract: `Basierend auf dem Quellmaterial, schreibe ein kurzes Abstract für den Blogpost. 1-2 Sätze, maximal 120 Zeichen. Sachlich, aber nicht trocken. Subtil eigene Haltung zeigen, ohne aufzutrumpfen. Keine Ausrufezeichen, keine rhetorischen Fragen, keine Wortspiele. Ruhig und klar. Gib NUR den Text zurück. Sprache: Deutsch.`,
   readmoretext: `Basierend auf dem Quellmaterial, generiere einen kurzen "Weiterlesen"-Text. Dieser Text erscheint als Call-to-Action unter dem Teaser. Maximal 50 Zeichen. Gib NUR den Text zurück (z.B. "Mehr über XY erfahren", "Warum XY wichtig ist"). Sprache: Deutsch.`,
-  generateAll: `Basierend auf dem Quellmaterial, generiere die folgenden Blog-Felder.
-Antworte im JSON-Format:
-
-{
-  "pagetitle": "Seitentitel (max 80 Zeichen)",
-  "pageintro": "Einleitungstext (2-4 Sätze)",
-  "teasertitle": "Teaser-Titel für Vorschau (max 60 Zeichen)",
-  "abstract": "Kurze Zusammenfassung (2-3 Sätze, 150-250 Zeichen)",
-  "readmoretext": "Weiterlesen CTA (max 50 Zeichen)"
-}
-
-Sprache: Deutsch.
-Antworte NUR mit dem JSON-Objekt, keine Erklärung.`,
   body: `Basierend auf dem folgenden Quellmaterial, schreibe einen ausführlichen, gut strukturierten Blogartikel.
 
 Anforderungen:
@@ -79,7 +66,6 @@ const PROMPT_FIELDS: { key: string; label: string; description: string }[] = [
   { key: "teasertitle", label: "Teaser Title", description: "Generates the teaser card headline (teasertitle)" },
   { key: "abstract", label: "Abstract", description: "Generates a short summary / abstract" },
   { key: "readmoretext", label: "Read More Text", description: "Generates the call-to-action text (readmoretext)" },
-  { key: "generateAll", label: "Generate All (combined)", description: "Used when generating all meta fields at once. Must produce JSON output." },
   { key: "body", label: "Body Article", description: "Generates the main blog article body content as a richtext block with headings, formatting and links." },
   { key: "headerImage", label: "Header Image (DALL-E)", description: "Meta-prompt: generates a DALL-E image prompt from the source material. The resulting prompt is then sent to DALL-E to create the header picture." },
 ];

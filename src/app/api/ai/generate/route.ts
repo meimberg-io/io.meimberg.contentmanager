@@ -6,7 +6,6 @@ import {
   generatePageIntro,
   generateTeaserTitle,
   generateReadMoreText,
-  generateAllFromSource,
   generateBody,
   optimizeText,
 } from '@/lib/openai'
@@ -40,7 +39,7 @@ export async function POST(request: Request) {
       instruction: optimizeInstruction,
       isFullDocument,
     } = body
-    // type: 'pagetitle' | 'abstract' | 'pageintro' | 'teasertitle' | 'readmoretext' | 'all' | 'body' | 'optimize'
+    // type: 'pagetitle' | 'abstract' | 'pageintro' | 'teasertitle' | 'readmoretext' | 'body' | 'optimize'
 
     // Get settings (model + prompts)
     const settings = await getSettings()
@@ -104,21 +103,6 @@ export async function POST(request: Request) {
         }
         genOptions.prompt = storedPrompts.body || ''
         result.bodyContent = await generateBody(genOptions)
-        break
-
-      case 'all':
-        if (!sourceRaw && !sourceSummarized) {
-          return NextResponse.json({ 
-            error: 'Source material (sourceRaw or sourceSummarized) is required for "Generate All"' 
-          }, { status: 400 })
-        }
-        result = await generateAllFromSource(
-          sourceRaw || '', 
-          sourceSummarized || '', 
-          hint, 
-          modelId,
-          storedPrompts.generateAll || ''
-        )
         break
 
       case 'optimize':
