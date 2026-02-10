@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import heroBg from "@/assets/hero-bg.jpg";
+import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 
@@ -29,28 +30,31 @@ export default function LoginPage() {
       <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/70 to-background/90" />
 
       <div className="relative z-10 w-full max-w-md space-y-8">
-        {/* Logo Section */}
-        <div className="text-center space-y-4 animate-fade-in">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-primary gold-glow">
-            <span className="font-display text-4xl font-bold text-primary-foreground">M</span>
-          </div>
-          <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight">
-              Blogmanager
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Manage Your Blog Content
-            </p>
-          </div>
-        </div>
-
         {/* Login Card */}
-        <Card className="glass-card border-border/50 animate-slide-up backdrop-blur-xl" style={{ animationDelay: "100ms" }}>
-          <CardContent className="pt-6 space-y-6">
+        <Card className="glass-card border-border/50 animate-slide-up backdrop-blur-xl">
+          <CardContent className="pt-8 space-y-6">
+            {/* Logo & Title */}
+            <div className="text-center space-y-4">
+              <Image
+                src="/apple-touch-icon.png"
+                alt="meimberg.io"
+                width={80}
+                height={80}
+                className="mx-auto h-20 w-20 rounded-2xl"
+              />
+              <div>
+                <h1 className="font-display text-3xl font-bold tracking-tight">
+                  Blogmanager
+                </h1>
+                <p className="text-muted-foreground mt-2">
+                  meimberg.io
+                </p>
+              </div>
+            </div>
+
             <div className="text-center space-y-2">
-              <h2 className="font-display text-2xl font-semibold">Welcome Back</h2>
               <p className="text-sm text-muted-foreground">
-                Sign in with your Google account to manage your blog content
+                Sign in with your Google account to continue
               </p>
             </div>
 

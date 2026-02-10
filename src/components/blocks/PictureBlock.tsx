@@ -24,8 +24,8 @@ interface PictureBlockProps {
 export function PictureBlock({ data, onChange }: PictureBlockProps) {
   const [uploading, setUploading] = useState(false);
   const imageUrl = data.image?.filename || "";
-  const style = data.style || "";
-  const spacing = data.spacing || "";
+  const style = data.style || "normal";
+  const spacing = data.spacing || "default";
 
   const handleUpload = async () => {
     const input = document.createElement("input");
@@ -116,16 +116,15 @@ export function PictureBlock({ data, onChange }: PictureBlockProps) {
         <div className="flex-1 space-y-1">
           <Label className="text-xs text-muted-foreground">Style</Label>
           <Select
-            value={style || "default"}
+            value={style}
             onValueChange={(v) =>
-              onChange({ ...data, style: v === "default" ? "" : v })
+              onChange({ ...data, style: v })
             }
           >
             <SelectTrigger className="text-xs h-8">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="default">Default</SelectItem>
               <SelectItem value="normal">Normal</SelectItem>
               <SelectItem value="keyvisual">Key Visual</SelectItem>
               <SelectItem value="small">Small</SelectItem>
@@ -135,17 +134,16 @@ export function PictureBlock({ data, onChange }: PictureBlockProps) {
         <div className="flex-1 space-y-1">
           <Label className="text-xs text-muted-foreground">Spacing</Label>
           <Select
-            value={spacing || "default_spacing"}
+            value={spacing}
             onValueChange={(v) =>
-              onChange({ ...data, spacing: v === "default_spacing" ? "" : v })
+              onChange({ ...data, spacing: v })
             }
           >
             <SelectTrigger className="text-xs h-8">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="default_spacing">Default</SelectItem>
-              <SelectItem value="default">Normal</SelectItem>
+              <SelectItem value="default">Default</SelectItem>
               <SelectItem value="large">Large</SelectItem>
             </SelectContent>
           </Select>

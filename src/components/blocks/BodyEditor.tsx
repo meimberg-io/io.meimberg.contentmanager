@@ -45,8 +45,8 @@ const BLOCK_TEMPLATES: Record<string, () => any> = {
     _uid: generateUid(),
     component: "picture",
     image: {},
-    style: "",
-    spacing: "",
+    style: "normal",
+    spacing: "default",
   }),
   youtube: () => ({
     _uid: generateUid(),
