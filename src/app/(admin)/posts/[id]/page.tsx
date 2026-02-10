@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { BlogPost } from "@/types";
@@ -157,6 +157,14 @@ export default function PostDetailPage() {
   // Body blocks
   const [bodyBlocks, setBodyBlocks] = useState<any[]>([]);
 
+  // Dirty tracking — snapshot of last-saved state
+  const [savedSnapshot, setSavedSnapshot] = useState("");
+  const isDirty = useMemo(() => {
+    if (!savedSnapshot) return false;
+    const current = JSON.stringify({ form, slugValue, bodyBlocks });
+    return current !== savedSnapshot || generatedImageBase64 !== null;
+  }, [form, slugValue, bodyBlocks, generatedImageBase64, savedSnapshot]);
+
   // Load post data
   const loadPost = useCallback(async () => {
     try {
@@ -199,6 +207,20 @@ export default function PostDetailPage() {
       setGeneratedImageBase64(null); // Clear any preview on reload
       if (transformed.aiHint) setTransientPromptHint(transformed.aiHint);
       if (transformed.imagePrompt) setImagePrompt(transformed.imagePrompt);
+
+      // Capture clean snapshot for dirty tracking
+      setSavedSnapshot(JSON.stringify({
+        form: {
+          pagetitle: transformed.pagetitle,
+          pageintro: transformed.pageintro,
+          teasertitle: transformed.teasertitle,
+          abstract: transformed.abstract,
+          readmoretext: transformed.readmoretext,
+          date: transformed.date,
+        },
+        slugValue: transformed.slug,
+        bodyBlocks: transformed.body || [],
+      }));
     } catch (error: any) {
       console.error("Failed to load post:", error);
       toast({
@@ -764,7 +786,7 @@ export default function PostDetailPage() {
 
           <Button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || !isDirty}
             className="gap-2 shrink-0"
           >
             {saving ? (
