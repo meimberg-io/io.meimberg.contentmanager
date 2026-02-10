@@ -72,9 +72,8 @@ export async function POST(request: Request) {
           cm_source_summarized: sourceSummarized,
         })
 
-        // TODO: Re-enable after testing is complete
-        // Delete email after successful import
-        // await deleteEmail(String(emailId))
+        // Delete email from inbox after successful import
+        await deleteEmail(String(emailId))
 
         // Rate limit delay for Storyblok
         await new Promise(resolve => setTimeout(resolve, 200))
