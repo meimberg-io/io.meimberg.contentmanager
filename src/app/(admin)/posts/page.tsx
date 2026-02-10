@@ -375,7 +375,7 @@ function AllPostsPageContent() {
     return true;
   });
 
-  if (loading) {
+  if (loading && posts.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-4">
