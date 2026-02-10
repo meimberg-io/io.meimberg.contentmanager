@@ -168,7 +168,15 @@ export default function PostDetailPage() {
           router.push("/posts");
           return;
         }
-        throw new Error("Failed to load post");
+        if (response.status === 401) {
+          toast({ title: "Session expired – please sign in again", variant: "destructive" });
+          router.push("/");
+          return;
+        }
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(
+          `Failed to load post (${response.status}): ${errorBody.error || response.statusText}`
+        );
       }
       const data = await response.json();
       const story = data.story;
@@ -191,8 +199,13 @@ export default function PostDetailPage() {
       setGeneratedImageBase64(null); // Clear any preview on reload
       if (transformed.aiHint) setTransientPromptHint(transformed.aiHint);
       if (transformed.imagePrompt) setImagePrompt(transformed.imagePrompt);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load post:", error);
+      toast({
+        title: "Failed to load post",
+        description: error.message || "Unknown error",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,6 @@
 
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -104,11 +103,11 @@ export function RichtextBlock({ data, onChange, blockUid }: RichtextBlockProps) 
         heading: {
           levels: [2, 3, 4],
         },
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: "text-primary underline",
+        link: {
+          openOnClick: false,
+          HTMLAttributes: {
+            class: "text-primary underline",
+          },
         },
       }),
       Image,
