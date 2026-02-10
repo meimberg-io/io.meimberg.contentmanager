@@ -238,6 +238,21 @@ export async function publishPost(storyId: string) {
   // Get current story and publish it
   const currentStory = await getPostById(storyId)
   
+  // Sanitize content before publishing — Storyblok rejects blank required fields
+  const content = { ...currentStory.content }
+  if (Array.isArray(content.body)) {
+    content.body = content.body.map((block: any) => {
+      if (block.component === 'picture') {
+        return {
+          ...block,
+          spacing: block.spacing || 'default',
+          style: block.style || 'normal',
+        }
+      }
+      return block
+    })
+  }
+  
   const response = await fetch(
     `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories/${storyId}`,
     {
@@ -248,7 +263,7 @@ export async function publishPost(storyId: string) {
       },
       body: JSON.stringify({
         story: {
-          content: currentStory.content,
+          content,
         },
         publish: 1
       })
