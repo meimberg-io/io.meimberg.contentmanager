@@ -52,9 +52,10 @@ export async function POST(request: Request) {
           sourceRaw = email.attachments[0].content
         }
 
-        // If no attachments, use email body as source
-        if (!sourceRaw && email.body) {
-          sourceRaw = email.body
+        // If no attachments, use email body as summarized source
+        // (email text is typically already a summary, not a raw transcription)
+        if (!sourceRaw && !sourceSummarized && email.body) {
+          sourceSummarized = email.body
         }
 
         // Create blog post in Storyblok
