@@ -119,6 +119,7 @@ All data lives in Storyblok (SaaS) — no local database.
 
 ## Related Documentation
 
+- [README.md](README.md) — Documentation index
 - [GITHUB-SETUP.md](GITHUB-SETUP.md) — GitHub configuration
 - [SETUP-CHECKLIST.md](SETUP-CHECKLIST.md) — Initial setup
 - [DOCKER-COMPOSE.md](DOCKER-COMPOSE.md) — Docker usage

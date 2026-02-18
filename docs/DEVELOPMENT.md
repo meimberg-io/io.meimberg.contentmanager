@@ -153,6 +153,7 @@ npm run generate-sb-types
 
 ## Related Documentation
 
+- [README.md](README.md) — Documentation index
 - [SETUP-CHECKLIST.md](SETUP-CHECKLIST.md) — Setup guide
 - [DOCKER-COMPOSE.md](DOCKER-COMPOSE.md) — Docker usage
 - [DEPLOYMENT.md](DEPLOYMENT.md) — Deployment guide

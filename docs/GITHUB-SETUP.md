@@ -145,6 +145,7 @@ https://contentmanager.meimberg.io/api/auth/callback/google
 
 ## Related Documentation
 
+- [README.md](README.md) — Documentation index
 - [DEPLOYMENT.md](DEPLOYMENT.md) — Deployment operations
 - [SETUP-CHECKLIST.md](SETUP-CHECKLIST.md) — Full setup checklist
 - [DOCKER-COMPOSE.md](DOCKER-COMPOSE.md) — Docker usage

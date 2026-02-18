@@ -34,7 +34,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-See [docs/SETUP-CHECKLIST.md](docs/SETUP-CHECKLIST.md) for the full setup guide.
+For full setup and onboarding, start with:
+- [docs/README.md](docs/README.md) — Documentation index
+- [docs/SETUP-CHECKLIST.md](docs/SETUP-CHECKLIST.md) — Local setup checklist
 
 ## Docker
 
@@ -48,8 +50,9 @@ docker compose --profile prod up --build
 
 ## Documentation
 
-- [SETUP-CHECKLIST.md](docs/SETUP-CHECKLIST.md) — Setup guide
-- [DEVELOPMENT.md](docs/DEVELOPMENT.md) — Development guide & architecture
-- [DEPLOYMENT.md](docs/DEPLOYMENT.md) — Production deployment
-- [DOCKER-COMPOSE.md](docs/DOCKER-COMPOSE.md) — Docker usage
-- [GITHUB-SETUP.md](docs/GITHUB-SETUP.md) — CI/CD & GitHub configuration
+- [docs/README.md](docs/README.md) — Start here (doc map and recommended reading order)
+- [docs/SETUP-CHECKLIST.md](docs/SETUP-CHECKLIST.md) — Local setup checklist
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — Development guide and architecture
+- [docs/DOCKER-COMPOSE.md](docs/DOCKER-COMPOSE.md) — Docker usage (dev + local prod test)
+- [docs/GITHUB-SETUP.md](docs/GITHUB-SETUP.md) — One-time GitHub/CI/CD configuration
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Deployment operations and rollback

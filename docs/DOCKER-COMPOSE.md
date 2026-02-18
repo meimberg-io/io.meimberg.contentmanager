@@ -78,6 +78,7 @@ docker compose down -v --rmi all
 
 ## Related Documentation
 
+- [README.md](README.md) — Documentation index
 - [DEVELOPMENT.md](DEVELOPMENT.md) — Development guide
 - [DEPLOYMENT.md](DEPLOYMENT.md) — Production deployment
 - [GITHUB-SETUP.md](GITHUB-SETUP.md) — CI/CD pipeline
