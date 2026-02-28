@@ -320,7 +320,12 @@ export default function PostDetailPage() {
         });
         const uploadData = await uploadRes.json();
         if (!uploadRes.ok) throw new Error(uploadData.error || "Image upload failed");
-        headerpictureUpdate = { filename: uploadData.assetUrl, alt: form.pagetitle || post.slug };
+        headerpictureUpdate = {
+          id: uploadData.assetId,
+          filename: uploadData.assetUrl,
+          alt: form.pagetitle || post.slug,
+          fieldtype: 'asset',
+        };
       }
 
       const response = await fetch("/api/posts", {

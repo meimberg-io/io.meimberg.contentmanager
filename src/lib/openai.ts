@@ -138,6 +138,20 @@ function markdownToProsemirror(markdown: string): any {
       continue
     }
 
+    // Markdown table (pipe syntax)
+    if (/^\|(.+)\|$/.test(line.trim())) {
+      const tableRows: string[] = []
+      while (i < lines.length && /^\|(.+)\|$/.test(lines[i].trim())) {
+        tableRows.push(lines[i])
+        i++
+      }
+      const parsed = parseMarkdownTable(tableRows)
+      if (parsed) {
+        content.push(parsed)
+      }
+      continue
+    }
+
     // Headings (# to ####) — map # to h2 since h1 is the page title
     const headingMatch = line.match(/^(#{1,4})\s+(.+)$/)
     if (headingMatch) {
@@ -240,6 +254,54 @@ function markdownToProsemirror(markdown: string): any {
   }
 
   return { type: 'doc', content }
+}
+
+/**
+ * Parse markdown pipe-table rows into a TipTap table node.
+ * Expects rows like `| col1 | col2 |`, with a separator row `| --- | --- |`.
+ */
+function parseMarkdownTable(rows: string[]): any | null {
+  if (rows.length < 2) return null
+
+  const parseCells = (row: string) =>
+    row.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim())
+
+  const headerCells = parseCells(rows[0])
+
+  // Find separator row (e.g. | --- | :---: |) and skip it
+  const isSeparator = (row: string) =>
+    /^\|[\s:]*-{2,}[\s:]*(\|[\s:]*-{2,}[\s:]*)*\|$/.test(row.trim())
+
+  let dataStartIndex = 1
+  if (rows.length > 1 && isSeparator(rows[1])) {
+    dataStartIndex = 2
+  }
+
+  const headerRow = {
+    type: 'tableRow',
+    content: headerCells.map(cell => ({
+      type: 'tableHeader',
+      attrs: { colspan: 1, rowspan: 1, colwidth: null },
+      content: [{ type: 'paragraph', content: parseInlineMarks(cell) }],
+    })),
+  }
+
+  const bodyRows = rows.slice(dataStartIndex).map(row => {
+    const cells = parseCells(row)
+    return {
+      type: 'tableRow',
+      content: cells.map(cell => ({
+        type: 'tableCell',
+        attrs: { colspan: 1, rowspan: 1, colwidth: null },
+        content: [{ type: 'paragraph', content: parseInlineMarks(cell) }],
+      })),
+    }
+  })
+
+  return {
+    type: 'table',
+    content: [headerRow, ...bodyRows],
+  }
 }
 
 /**

@@ -15,6 +15,22 @@ if (!MANAGEMENT_TOKEN) {
   console.warn('STORYBLOK_MANAGEMENT_TOKEN is not set. Write operations will fail.')
 }
 
+const WWW_REVALIDATE_URL = process.env.WWW_REVALIDATE_URL
+
+async function revalidateWww() {
+  if (!WWW_REVALIDATE_URL) return
+  try {
+    const res = await fetch(WWW_REVALIDATE_URL, { method: 'POST' })
+    if (!res.ok) {
+      console.warn(`[revalidateWww] ${res.status} ${res.statusText}`)
+    } else {
+      console.log('[revalidateWww] Cache invalidated')
+    }
+  } catch (err) {
+    console.warn('[revalidateWww] Failed:', err)
+  }
+}
+
 export interface BlogPostData {
   // Content fields
   pagetitle?: string
@@ -275,6 +291,7 @@ export async function publishPost(storyId: string) {
     throw new Error(`Failed to publish post: ${error.error || response.statusText}`)
   }
 
+  await revalidateWww()
   return await response.json()
 }
 
@@ -301,6 +318,7 @@ export async function unpublishPost(storyId: string) {
     throw new Error(`Failed to unpublish post: ${error.error || response.statusText}`)
   }
 
+  await revalidateWww()
   return { success: true }
 }
 

@@ -37,6 +37,8 @@ services:
       - PUBLER_API_KEY=${PUBLER_API_KEY}
       - PUBLER_API_URL=${PUBLER_API_URL:-https://app.publer.com/api/v1}
       - PUBLER_WORKSPACE_ID=${PUBLER_WORKSPACE_ID}
+      # Website cache invalidation
+      - WWW_REVALIDATE_URL=${WWW_REVALIDATE_URL}
     restart: unless-stopped
     networks:
       - app-network

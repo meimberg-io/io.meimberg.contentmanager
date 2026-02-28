@@ -3,6 +3,10 @@
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
+import { Table } from "@tiptap/extension-table";
+import { TableRow } from "@tiptap/extension-table-row";
+import { TableHeader } from "@tiptap/extension-table-header";
+import { TableCell } from "@tiptap/extension-table-cell";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +21,11 @@ import {
   Redo,
   Link as LinkIcon,
   Minus,
+  Table2,
+  Trash2,
+  Plus,
+  ArrowDown,
+  ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +56,9 @@ const SB_TO_TIPTAP_TYPES: Record<string, string> = {
   horizontal_rule: "horizontalRule",
   hard_break: "hardBreak",
   code_block: "codeBlock",
+  table_row: "tableRow",
+  table_header: "tableHeader",
+  table_cell: "tableCell",
 };
 
 const TIPTAP_TO_SB_TYPES: Record<string, string> = {
@@ -56,6 +68,9 @@ const TIPTAP_TO_SB_TYPES: Record<string, string> = {
   horizontalRule: "horizontal_rule",
   hardBreak: "hard_break",
   codeBlock: "code_block",
+  tableRow: "table_row",
+  tableHeader: "table_header",
+  tableCell: "table_cell",
 };
 
 /**
@@ -111,6 +126,10 @@ export function RichtextBlock({ data, onChange, blockUid }: RichtextBlockProps) 
         },
       }),
       Image,
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     content: initialContent.current,
     editorProps: {
@@ -228,6 +247,35 @@ export function RichtextBlock({ data, onChange, blockUid }: RichtextBlockProps) 
         >
           <Minus className="h-3.5 w-3.5" />
         </ToolbarButton>
+        <div className="w-px h-5 bg-border/50 mx-0.5" />
+        <ToolbarButton
+          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          title="Insert Table"
+        >
+          <Table2 className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        {editor.isActive("table") && (
+          <>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().addRowAfter().run()}
+              title="Add Row"
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().addColumnAfter().run()}
+              title="Add Column"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().deleteTable().run()}
+              title="Delete Table"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </ToolbarButton>
+          </>
+        )}
         <div className="flex-1" />
         <ToolbarButton
           onClick={() => editor.chain().focus().undo().run()}

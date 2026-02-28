@@ -54,6 +54,7 @@ export function PictureBlock({ data, onChange }: PictureBlockProps) {
             ...data.image,
             filename: result.filename || result.publicUrl,
             id: result.id,
+            fieldtype: 'asset',
           },
         });
       } catch (error) {

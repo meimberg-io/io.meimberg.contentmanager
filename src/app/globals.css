@@ -352,6 +352,27 @@ textarea {
   .ProseMirror pre code {
     @apply bg-transparent p-0;
   }
+  .ProseMirror table {
+    @apply w-full my-3 text-sm;
+    border-collapse: collapse;
+  }
+  .ProseMirror th {
+    @apply text-left py-1.5 px-3 font-semibold text-xs;
+    color: hsl(var(--foreground));
+    border-bottom: 2px solid hsl(var(--border));
+    background: hsl(var(--secondary) / 0.5);
+  }
+  .ProseMirror td {
+    @apply py-1.5 px-3 text-sm;
+    color: #aaaaaa;
+    border-bottom: 1px solid hsl(var(--border) / 0.3);
+  }
+  .ProseMirror tr:hover td {
+    background: hsl(var(--secondary) / 0.3);
+  }
+  .ProseMirror .selectedCell {
+    background: hsl(var(--primary) / 0.1);
+  }
 
   /* Source Material Markdown Styles */
   .source-markdown {
