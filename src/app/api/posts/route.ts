@@ -109,6 +109,7 @@ export async function POST(request: Request) {
       readmoretext: body.readmoretext || '',
       cm_source_raw: body.source_raw || '',
       cm_source_summarized: body.source_summarized || '',
+      cm_origin: body.cm_origin === 'import' || body.cm_origin === 'create' ? body.cm_origin : undefined,
     })
 
     return NextResponse.json(result)

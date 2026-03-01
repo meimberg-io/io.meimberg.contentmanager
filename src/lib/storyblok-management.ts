@@ -47,6 +47,8 @@ export interface BlogPostData {
   cm_source_summarized?: string
   cm_ai_hint?: string
   cm_image_prompt?: string
+  // Origin (import / create / manual)
+  cm_origin?: 'import' | 'create'
   // Status fields
   cm_content_complete?: boolean
   cm_content_confirmed_at?: string

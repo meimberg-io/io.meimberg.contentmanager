@@ -6,9 +6,15 @@ import { BlogPost } from "@/types";
 import { StatusRow } from "@/components/ui/StatusIcon";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Upload, FileEdit } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PostCardProps {
   post: BlogPost;
@@ -17,6 +23,38 @@ interface PostCardProps {
   viewMode?: "grid" | "list";
   hideActions?: boolean;
   selectionMode?: boolean;
+}
+
+function OriginIcon({ origin }: { origin?: 'import' | 'create' }) {
+  if (origin === 'import') {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex text-muted-foreground" aria-label="Importiert">
+              <Upload className="h-3.5 w-3.5" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Importiert</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+  if (origin === 'create') {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex text-muted-foreground" aria-label="Erstellt">
+              <FileEdit className="h-3.5 w-3.5" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Erstellt</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+  return null
 }
 
 export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideActions = false, selectionMode = false }: PostCardProps) {
@@ -60,6 +98,9 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
         </div>
 
         <div className="flex items-center gap-3">
+          {post.origin && (
+            <OriginIcon origin={post.origin} />
+          )}
           <span className="text-xs text-muted-foreground whitespace-nowrap">
             {post.date || 'No date'}
           </span>
@@ -125,7 +166,10 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{post.abstract}</p>
 
         <div className="flex items-center justify-between mt-3">
-          <span className="text-xs text-muted-foreground">{post.date || 'No date'}</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {post.origin && <OriginIcon origin={post.origin} />}
+            {post.date || 'No date'}
+          </span>
           <StatusRow status={post.status} />
         </div>
       </div>

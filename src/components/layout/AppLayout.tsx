@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
+  PlusCircle,
   Upload, 
   FileText, 
   Settings, 
@@ -34,6 +35,7 @@ interface AppLayoutProps {
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { label: "Create", icon: PlusCircle, path: "/create" },
   { label: "Import", icon: Upload, path: "/import" },
   { label: "All Posts", icon: FileText, path: "/posts" },
   { label: "Settings", icon: Settings, path: "/settings" },

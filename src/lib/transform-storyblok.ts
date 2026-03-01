@@ -25,6 +25,7 @@ export function transformStoryblokBlog(story: any): BlogPost {
     // Source material
     sourceRaw: content.cm_source_raw || undefined,
     sourceSummarized: content.cm_source_summarized || undefined,
+    origin: content.cm_origin === 'import' || content.cm_origin === 'create' ? content.cm_origin : undefined,
     aiHint: content.cm_ai_hint || undefined,
     imagePrompt: content.cm_image_prompt || undefined,
     // Status

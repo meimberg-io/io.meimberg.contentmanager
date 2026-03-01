@@ -71,6 +71,7 @@ export async function POST(request: Request) {
           readmoretext: '',
           cm_source_raw: sourceRaw,
           cm_source_summarized: sourceSummarized,
+          cm_origin: 'import',
         })
 
         // Delete email from inbox after successful import

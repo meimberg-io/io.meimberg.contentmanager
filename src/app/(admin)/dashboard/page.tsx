@@ -3,7 +3,7 @@
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ActivityList } from "@/components/dashboard/ActivityList";
 import { Button } from "@/components/ui/button";
-import { FileText, CheckCircle, Globe, Smartphone, Upload, FolderOpen } from "lucide-react";
+import { FileText, CheckCircle, Globe, Smartphone, Upload, FolderOpen, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
@@ -129,6 +129,12 @@ export default function DashboardPage() {
       </div>
 
       <div className="flex flex-wrap gap-4 animate-fade-in" style={{ animationDelay: "200ms" }}>
+        <Link href="/create">
+          <Button size="lg" className="gap-2 gold-glow">
+            <PlusCircle className="h-5 w-5" />
+            Create new post
+          </Button>
+        </Link>
         <Link href="/import">
           <Button size="lg" className="gap-2 gold-glow">
             <Upload className="h-5 w-5" />
