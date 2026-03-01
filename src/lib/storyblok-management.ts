@@ -57,6 +57,30 @@ export interface BlogPostData {
   cm_publer_post_ids?: string
 }
 
+/** Ensure asset objects have fieldtype so Storyblok accepts them; avoid sending partial assets or raw URLs. */
+function ensureAssetField(obj: any): any {
+  if (obj == null) return obj
+  if (typeof obj === 'string' && obj) return { filename: obj, fieldtype: 'asset' }
+  if (typeof obj !== 'object') return obj
+  if (obj.fieldtype === 'asset') return obj
+  if (obj.filename) return { ...obj, fieldtype: 'asset' }
+  return obj
+}
+
+/** Normalize content before sending to Storyblok so all asset fields are valid. */
+function sanitizeContentForStoryblok(content: Record<string, any>): void {
+  content.headerpicture = ensureAssetField(content.headerpicture)
+  content.teaserimage = ensureAssetField(content.teaserimage)
+  if (Array.isArray(content.body)) {
+    content.body = content.body.map((block: any) => {
+      if (block.component === 'picture' && block.image) {
+        return { ...block, image: ensureAssetField(block.image) }
+      }
+      return block
+    })
+  }
+}
+
 /**
  * Get the blog folder ID (or create it if it doesn't exist)
  */
@@ -183,7 +207,8 @@ export async function updatePost(
     ...currentStory.content,
     ...data,
   }
-  
+  sanitizeContentForStoryblok(mergedContent)
+
   // Build story update object
   const storyUpdate: Record<string, any> = {
     content: mergedContent
@@ -256,7 +281,7 @@ export async function publishPost(storyId: string) {
   // Get current story and publish it
   const currentStory = await getPostById(storyId)
   
-  // Sanitize content before publishing — Storyblok rejects blank required fields
+  // Sanitize content before publishing — Storyblok rejects blank required fields and needs valid assets
   const content = { ...currentStory.content }
   if (Array.isArray(content.body)) {
     content.body = content.body.map((block: any) => {
@@ -265,12 +290,15 @@ export async function publishPost(storyId: string) {
           ...block,
           spacing: block.spacing || 'default',
           style: block.style || 'normal',
+          image: ensureAssetField(block.image),
         }
       }
       return block
     })
   }
-  
+  content.headerpicture = ensureAssetField(content.headerpicture)
+  content.teaserimage = ensureAssetField(content.teaserimage)
+
   const response = await fetch(
     `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories/${storyId}`,
     {
