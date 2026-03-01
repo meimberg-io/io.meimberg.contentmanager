@@ -40,7 +40,7 @@ export async function fetchBlogPosts(options?: {
     },
     per_page: options?.perPage || 100,
     page: options?.page || 1,
-    sort_by: 'created_at:desc'
+    sort_by: 'content.date:desc'
   }
 
   // Add filters if provided

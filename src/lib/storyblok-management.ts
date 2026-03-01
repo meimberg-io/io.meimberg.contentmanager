@@ -432,7 +432,7 @@ export async function fetchBlogPostsManagement(options?: {
   const page = options?.page || 1
 
   const response = await fetch(
-    `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?starts_with=b/&per_page=${perPage}&page=${page}&sort_by=created_at:desc`,
+    `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?starts_with=b/&per_page=${perPage}&page=${page}&sort_by=content.date:desc`,
     {
       headers: {
         'Authorization': MANAGEMENT_TOKEN,

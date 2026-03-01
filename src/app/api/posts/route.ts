@@ -70,6 +70,14 @@ export async function GET(request: Request) {
       })
     }
 
+    // Sort by blog post date (content.date), newest first; fallback to created_at
+    const postDate = (s: any) => s?.content?.date || s?.created_at || ''
+    stories = [...stories].sort((a, b) => {
+      const da = postDate(a)
+      const db = postDate(b)
+      return new Date(db).getTime() - new Date(da).getTime()
+    })
+
     return NextResponse.json({
       posts: stories,
       total: stories.length,
