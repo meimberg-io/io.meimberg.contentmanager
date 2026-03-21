@@ -7,10 +7,15 @@ import { BlogPost } from '@/types'
 export function transformStoryblokBlog(story: any): BlogPost {
   const content = story.content || {}
 
+  const component = content.component
+  const contentType =
+    component === 'article' ? 'article' : 'blog'
+
   return {
     id: story.uuid,
     storyblokId: String(story.id),
     slug: story.slug || '',
+    contentType,
     // Blog content fields
     pagetitle: content.pagetitle || '',
     pageintro: content.pageintro || '',

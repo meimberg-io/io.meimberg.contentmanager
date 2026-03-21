@@ -10,7 +10,7 @@ import {
   optimizeText,
 } from '@/lib/openai'
 import { updatePost } from '@/lib/storyblok-management'
-import { getSettings } from '@/lib/settings-storage'
+import { getSettings, DEFAULT_PROMPTS } from '@/lib/settings-storage'
 import { isModelAvailable, DEFAULT_MODEL } from '@/lib/ai-provider'
 
 /**
@@ -27,17 +27,18 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { 
-      storyId, 
-      type, 
-      sourceRaw, 
-      sourceSummarized, 
-      hint, 
+    const {
+      storyId,
+      type,
+      sourceRaw,
+      sourceSummarized,
+      hint,
       modelId: requestModelId,
       existingContent,
       text: optimizeInputText,
       instruction: optimizeInstruction,
       isFullDocument,
+      contentType: requestContentType,
     } = body
     // type: 'pagetitle' | 'abstract' | 'pageintro' | 'teasertitle' | 'readmoretext' | 'body' | 'optimize'
 
@@ -101,7 +102,12 @@ export async function POST(request: Request) {
             error: 'Source material is required for body generation' 
           }, { status: 400 })
         }
-        genOptions.prompt = storedPrompts.body || ''
+        {
+          const isArticle = requestContentType === 'article'
+          genOptions.prompt = isArticle
+            ? (storedPrompts.bodyArticle || DEFAULT_PROMPTS.bodyArticle)
+            : (storedPrompts.body || DEFAULT_PROMPTS.body)
+        }
         result.bodyContent = await generateBody(genOptions)
         break
 

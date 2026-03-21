@@ -46,6 +46,21 @@ Anforderungen:
 
 Sprache: Deutsch.
 Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
+  bodyArticle: `Basierend auf dem folgenden Quellmaterial, schreibe einen sachlichen, gut strukturierten Fachartikel.
+
+Anforderungen:
+- Strukturiere den Text mit Überschriften: ## für Hauptabschnitte und ### für Unterabschnitte.
+- Verwende **fett** für zentrale Begriffe und **kursiv** nur bei Fachbegriffen, wo es sinnvoll ist.
+- Nutze Aufzählungen mit Bindestrich (- Punkt 1) für klare Auflistungen.
+- Füge relevante Links ein, wenn im Quellmaterial URLs vorkommen: [Linktext](URL)
+- Länge etwa 800–1500 Wörter.
+- Ton: nüchtern, informativ, klar. Keine persönliche Meinung, keine rhetorischen Fragen, keine provokanten Formulierungen, keine Ausrufezeichen als Stilmittel.
+- Sachlich erklären und einordnen; keine direkte Ansprache des Lesers (kein "du", "ihr", "Sie").
+- Beginne NICHT mit einer # Überschrift (Seitentitel wird separat gesetzt).
+- Beginne mit einem kurzen einleitenden Absatz, danach ## Abschnitte.
+
+Sprache: Deutsch.
+Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
   headerImage: `Basierend auf dem folgenden Quellmaterial, erstelle eine prägnante Bildbeschreibung (Prompt) für ein KI-generiertes Header-Bild eines Blogposts.
 
 Anforderungen:
@@ -66,7 +81,8 @@ const PROMPT_FIELDS: { key: string; label: string; description: string }[] = [
   { key: "teasertitle", label: "Teaser Title", description: "Generates the teaser card headline (teasertitle)" },
   { key: "abstract", label: "Abstract", description: "Generates a short summary / abstract" },
   { key: "readmoretext", label: "Read More Text", description: "Generates the call-to-action text (readmoretext)" },
-  { key: "body", label: "Body Article", description: "Generates the main blog article body content as a richtext block with headings, formatting and links." },
+  { key: "body", label: "Body Article (Blog)", description: "Generates the main body for Blog content type (persönlicher, meinungsstarker Stil)." },
+  { key: "bodyArticle", label: "Body Article (Artikel)", description: "Generates the main body when content type is Article (sachlich, neutral)." },
   { key: "headerImage", label: "Header Image (DALL-E)", description: "Meta-prompt: generates a DALL-E image prompt from the source material. The resulting prompt is then sent to DALL-E to create the header picture." },
 ];
 

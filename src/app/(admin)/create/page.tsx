@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { PlusCircle, Loader2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import type { Editor } from '@tiptap/react'
@@ -18,6 +26,7 @@ export default function CreatePostPage() {
   const router = useRouter()
   const editorRef = useRef<Editor | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [contentType, setContentType] = useState<'blog' | 'article'>('blog')
 
   const onEditorReady = useCallback((editor: Editor) => {
     editorRef.current = editor
@@ -51,6 +60,7 @@ export default function CreatePostPage() {
           source_raw: text,
           source_summarized: text,
           cm_origin: 'create',
+          contentType,
         }),
       })
 
@@ -92,6 +102,22 @@ export default function CreatePostPage() {
         <p className="text-muted-foreground mt-1">
           Write your source material in the editor. It will be stored as Quellmaterial so you can use the same AI tools as with imported posts.
         </p>
+      </div>
+
+      <div className="space-y-2 max-w-xs">
+        <Label className="text-sm text-muted-foreground">Content type</Label>
+        <Select
+          value={contentType}
+          onValueChange={(v) => setContentType(v === 'article' ? 'article' : 'blog')}
+        >
+          <SelectTrigger className="bg-secondary/50">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="blog">Blog (b/)</SelectItem>
+            <SelectItem value="article">Article (a/)</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <CreatePageEditor onEditorReady={onEditorReady} />

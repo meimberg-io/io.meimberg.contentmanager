@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BlogPost } from "@/types";
 import { StatusRow } from "@/components/ui/StatusIcon";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil, Trash2, Upload, FileEdit } from "lucide-react";
 import Link from "next/link";
@@ -93,7 +94,12 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
         )}
 
         <div className="flex-1 min-w-0">
-          <p className="font-medium break-words">{post.pagetitle || post.slug}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium break-words">{post.pagetitle || post.slug}</p>
+            <Badge variant="outline" className="text-[10px] shrink-0">
+              {post.contentType === "article" ? "Article" : "Blog"}
+            </Badge>
+          </div>
           <p className="text-sm text-muted-foreground break-words whitespace-normal">{post.abstract}</p>
         </div>
 
@@ -162,7 +168,12 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
 
       {/* Content */}
       <div className="p-4">
-        <h3 className="font-medium truncate">{post.pagetitle || post.slug}</h3>
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-medium truncate flex-1 min-w-0">{post.pagetitle || post.slug}</h3>
+          <Badge variant="outline" className="text-[10px] shrink-0">
+            {post.contentType === "article" ? "Article" : "Blog"}
+          </Badge>
+        </div>
         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{post.abstract}</p>
 
         <div className="flex items-center justify-between mt-3">

@@ -12,6 +12,8 @@ export interface AiPrompts {
   abstract?: string
   readmoretext?: string
   body?: string
+  /** Body generation when content type is Article (sachlich, neutral) */
+  bodyArticle?: string
   headerImage?: string
 }
 
@@ -40,6 +42,21 @@ Anforderungen:
 - Trau dich, eigene Einordnungen und Meinungen zu formulieren, statt nur neutral zu berichten.
 - Beginne NICHT mit einem Titel oder einer Überschrift der Ebene # (der Seitentitel wird separat generiert)
 - Beginne direkt mit einem einleitenden Absatz, dann folgen die ## Abschnitte
+
+Sprache: Deutsch.
+Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
+  bodyArticle: `Basierend auf dem folgenden Quellmaterial, schreibe einen sachlichen, gut strukturierten Fachartikel.
+
+Anforderungen:
+- Strukturiere den Text mit Überschriften: ## für Hauptabschnitte und ### für Unterabschnitte.
+- Verwende **fett** für zentrale Begriffe und **kursiv** nur bei Fachbegriffen, wo es sinnvoll ist.
+- Nutze Aufzählungen mit Bindestrich (- Punkt 1) für klare Auflistungen.
+- Füge relevante Links ein, wenn im Quellmaterial URLs vorkommen: [Linktext](URL)
+- Länge etwa 800–1500 Wörter.
+- Ton: nüchtern, informativ, klar. Keine persönliche Meinung, keine rhetorischen Fragen, keine provokanten Formulierungen, keine Ausrufezeichen als Stilmittel.
+- Sachlich erklären und einordnen; keine direkte Ansprache des Lesers (kein "du", "ihr", "Sie").
+- Beginne NICHT mit einer # Überschrift (Seitentitel wird separat gesetzt).
+- Beginne mit einem kurzen einleitenden Absatz, danach ## Abschnitte.
 
 Sprache: Deutsch.
 Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,

@@ -7,11 +7,14 @@ export interface StatusCheck {
   errorMessage?: string;
 }
 
+export type PostContentType = 'blog' | 'article'
+
 // Main Blog Post Model
 export interface BlogPost {
   id: string;              // Storyblok UUID
   storyblokId: string;     // Numeric story ID for Management API
   slug: string;            // URL slug
+  contentType: PostContentType
   // Blog content fields
   pagetitle: string;
   pageintro: string;

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { BlogPost } from "@/types";
+import { BlogPost, type PostContentType } from "@/types";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
 // StatusRow removed - using inline StatusDot instead
 import { Button } from "@/components/ui/button";
@@ -144,6 +144,10 @@ export default function PostDetailPage() {
   const [slugValue, setSlugValue] = useState("");
   const [originalSlug, setOriginalSlug] = useState("");
 
+  const [contentType, setContentType] = useState<PostContentType>("blog");
+  const [originalContentType, setOriginalContentType] =
+    useState<PostContentType>("blog");
+
   // Editable fields
   const [form, setForm] = useState({
     pagetitle: "",
@@ -161,9 +165,14 @@ export default function PostDetailPage() {
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const isDirty = useMemo(() => {
     if (!savedSnapshot) return false;
-    const current = JSON.stringify({ form, slugValue, bodyBlocks });
+    const current = JSON.stringify({
+      form,
+      slugValue,
+      bodyBlocks,
+      contentType,
+    });
     return current !== savedSnapshot || generatedImageBase64 !== null;
-  }, [form, slugValue, bodyBlocks, generatedImageBase64, savedSnapshot]);
+  }, [form, slugValue, bodyBlocks, contentType, generatedImageBase64, savedSnapshot]);
 
   // Load post data
   const loadPost = useCallback(async () => {
@@ -202,6 +211,8 @@ export default function PostDetailPage() {
       });
       setSlugValue(transformed.slug);
       setOriginalSlug(transformed.slug);
+      setContentType(transformed.contentType);
+      setOriginalContentType(transformed.contentType);
       setBodyBlocks(transformed.body || []);
       setHeaderPictureUrl(transformed.headerpicture);
       setGeneratedImageBase64(null); // Clear any preview on reload
@@ -220,6 +231,7 @@ export default function PostDetailPage() {
         },
         slugValue: transformed.slug,
         bodyBlocks: transformed.body || [],
+        contentType: transformed.contentType,
       }));
     } catch (error: any) {
       console.error("Failed to load post:", error);
@@ -334,6 +346,7 @@ export default function PostDetailPage() {
         body: JSON.stringify({
           id: post.storyblokId,
           ...(slugValue !== originalSlug ? { slug: slugValue } : {}),
+          ...(contentType !== originalContentType ? { contentType } : {}),
           ...form,
           body: bodyBlocks,
           cm_ai_hint: transientPromptHint || "",
@@ -478,6 +491,7 @@ export default function PostDetailPage() {
           hint: transientPromptHint || undefined,
           modelId: transientModel || undefined,
           existingContent: form,
+          contentType,
         }),
       });
 
@@ -518,6 +532,7 @@ export default function PostDetailPage() {
           hint: transientPromptHint || undefined,
           modelId: transientModel || undefined,
           existingContent: form,
+          contentType,
         }),
       });
 
@@ -783,7 +798,7 @@ export default function PostDetailPage() {
               </h1>
               <div className="flex items-center gap-3 mt-1">
                 <span className="text-sm text-muted-foreground truncate">
-                  /{post.slug}
+                  {contentType === "article" ? "a" : "b"}/{post.slug}
                 </span>
               </div>
             </div>
@@ -1281,6 +1296,29 @@ export default function PostDetailPage() {
 
             <CollapsibleContent>
               <div className="space-y-3 pt-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Content Type</Label>
+                  <Select
+                    value={contentType}
+                    onValueChange={(v) =>
+                      setContentType(v === "article" ? "article" : "blog")
+                    }
+                  >
+                    <SelectTrigger className="bg-secondary/50">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="blog">Blog</SelectItem>
+                      <SelectItem value="article">Article</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {contentType !== originalContentType && (
+                    <p className="text-xs text-amber-500/90">
+                      Save to move to {contentType === "article" ? "a/" : "b/"} and convert component in Storyblok.
+                    </p>
+                  )}
+                </div>
+
                 {/* Slug */}
                 <div className="space-y-1.5">
                   <Label htmlFor="slug" className="text-xs text-muted-foreground">Slug</Label>

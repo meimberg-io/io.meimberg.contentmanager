@@ -107,6 +107,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     
+    const contentType =
+      body.contentType === 'article' ? 'article' : 'blog'
+
     const result = await createPost({
       name: body.name,
       pagetitle: body.pagetitle || '',
@@ -118,6 +121,7 @@ export async function POST(request: Request) {
       cm_source_raw: body.source_raw || '',
       cm_source_summarized: body.source_summarized || '',
       cm_origin: body.cm_origin === 'import' || body.cm_origin === 'create' ? body.cm_origin : undefined,
+      contentType,
     })
 
     return NextResponse.json(result)
@@ -139,13 +143,24 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json()
-    const { id, slug: newSlug, ...updates } = body
-    
-    const options: { storyName?: string; slug?: string } = {}
+    const { id, slug: newSlug, contentType: rawContentType, ...updates } = body
+
+    const options: {
+      storyName?: string
+      slug?: string
+      contentType?: 'blog' | 'article'
+    } = {}
     if (updates.pagetitle) options.storyName = updates.pagetitle
     if (newSlug) options.slug = newSlug
-    
-    const result = await updatePost(id, updates, Object.keys(options).length ? options : undefined)
+    if (rawContentType === 'article' || rawContentType === 'blog') {
+      options.contentType = rawContentType
+    }
+
+    const result = await updatePost(
+      id,
+      updates,
+      Object.keys(options).length ? options : undefined
+    )
     
     return NextResponse.json(result)
   } catch (error: any) {
