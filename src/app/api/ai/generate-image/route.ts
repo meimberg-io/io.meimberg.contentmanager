@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-guard'
 import { generateImagePrompt, generateHeaderImage } from '@/lib/openai'
 import { uploadAsset } from '@/lib/storyblok-management'
-import { getSettings } from '@/lib/settings-storage'
+import { getSettings, DEFAULT_PROMPTS } from '@/lib/settings-storage'
 import { isModelAvailable, DEFAULT_MODEL } from '@/lib/ai-provider'
 
 /**
@@ -25,20 +25,30 @@ export async function POST(request: Request) {
 
     if (action === 'prompt') {
       // Generate a DALL-E prompt from source material
-      const { sourceRaw, sourceSummarized, hint, modelId: requestModelId } = body
+      const {
+        sourceRaw,
+        sourceSummarized,
+        hint,
+        modelId: requestModelId,
+        contentType: requestContentType,
+      } = body
 
       const settings = await getSettings()
       let modelId = requestModelId || settings.aiModel || DEFAULT_MODEL
       if (!isModelAvailable(modelId)) modelId = DEFAULT_MODEL
 
       const storedPrompts = settings.aiPrompts || {}
+      const isArticle = requestContentType === 'article'
+      const metaPrompt = isArticle
+        ? (storedPrompts.headerImageArticle || DEFAULT_PROMPTS.headerImageArticle)
+        : (storedPrompts.headerImage || DEFAULT_PROMPTS.headerImage)
 
       const imagePrompt = await generateImagePrompt({
         sourceRaw,
         sourceSummarized,
         hint,
         modelId,
-        prompt: storedPrompts.headerImage || '',
+        prompt: metaPrompt,
       })
 
       return NextResponse.json({ success: true, imagePrompt })

@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { BlogPost, type PostContentType } from "@/types";
+import { BlogPost, type EditorKind } from "@/types";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
+import { editorKindFromPost, splitEditorKind } from "@/lib/editor-kind";
 // StatusRow removed - using inline StatusDot instead
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,9 +145,15 @@ export default function PostDetailPage() {
   const [slugValue, setSlugValue] = useState("");
   const [originalSlug, setOriginalSlug] = useState("");
 
-  const [contentType, setContentType] = useState<PostContentType>("blog");
-  const [originalContentType, setOriginalContentType] =
-    useState<PostContentType>("blog");
+  const [editorKind, setEditorKind] = useState<EditorKind>("blog_long");
+  const [originalEditorKind, setOriginalEditorKind] =
+    useState<EditorKind>("blog_long");
+
+  const storyKind = useMemo(() => splitEditorKind(editorKind), [editorKind]);
+  const originalStoryKind = useMemo(
+    () => splitEditorKind(originalEditorKind),
+    [originalEditorKind]
+  );
 
   // Editable fields
   const [form, setForm] = useState({
@@ -169,10 +176,10 @@ export default function PostDetailPage() {
       form,
       slugValue,
       bodyBlocks,
-      contentType,
+      editorKind,
     });
     return current !== savedSnapshot || generatedImageBase64 !== null;
-  }, [form, slugValue, bodyBlocks, contentType, generatedImageBase64, savedSnapshot]);
+  }, [form, slugValue, bodyBlocks, editorKind, generatedImageBase64, savedSnapshot]);
 
   // Load post data
   const loadPost = useCallback(async () => {
@@ -211,8 +218,12 @@ export default function PostDetailPage() {
       });
       setSlugValue(transformed.slug);
       setOriginalSlug(transformed.slug);
-      setContentType(transformed.contentType);
-      setOriginalContentType(transformed.contentType);
+      const ek = editorKindFromPost({
+        contentType: transformed.contentType,
+        blogBodyVariant: transformed.blogBodyVariant,
+      });
+      setEditorKind(ek);
+      setOriginalEditorKind(ek);
       setBodyBlocks(transformed.body || []);
       setHeaderPictureUrl(transformed.headerpicture);
       setGeneratedImageBase64(null); // Clear any preview on reload
@@ -231,7 +242,7 @@ export default function PostDetailPage() {
         },
         slugValue: transformed.slug,
         bodyBlocks: transformed.body || [],
-        contentType: transformed.contentType,
+        editorKind: ek,
       }));
     } catch (error: any) {
       console.error("Failed to load post:", error);
@@ -287,6 +298,7 @@ export default function PostDetailPage() {
             action: "prompt",
             sourceRaw: post.sourceRaw,
             sourceSummarized: post.sourceSummarized,
+            contentType: post.contentType ?? "blog",
           }),
         });
         const data = await res.json();
@@ -298,7 +310,7 @@ export default function PostDetailPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [post?.storyblokId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [post?.storyblokId, post?.contentType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear optimize snapshot on manual edits to the body
   useEffect(() => {
@@ -340,13 +352,18 @@ export default function PostDetailPage() {
         };
       }
 
+      const sk = splitEditorKind(editorKind);
+      const osk = splitEditorKind(originalEditorKind);
       const response = await fetch("/api/posts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: post.storyblokId,
           ...(slugValue !== originalSlug ? { slug: slugValue } : {}),
-          ...(contentType !== originalContentType ? { contentType } : {}),
+          ...(sk.contentType !== osk.contentType ? { contentType: sk.contentType } : {}),
+          ...(sk.contentType === "blog"
+            ? { blogBodyVariant: sk.blogBodyVariant }
+            : {}),
           ...form,
           body: bodyBlocks,
           cm_ai_hint: transientPromptHint || "",
@@ -491,7 +508,7 @@ export default function PostDetailPage() {
           hint: transientPromptHint || undefined,
           modelId: transientModel || undefined,
           existingContent: form,
-          contentType,
+          contentType: storyKind.contentType,
         }),
       });
 
@@ -532,7 +549,10 @@ export default function PostDetailPage() {
           hint: transientPromptHint || undefined,
           modelId: transientModel || undefined,
           existingContent: form,
-          contentType,
+          contentType: storyKind.contentType,
+          ...(storyKind.contentType === "blog"
+            ? { blogBodyVariant: storyKind.blogBodyVariant }
+            : {}),
         }),
       });
 
@@ -689,6 +709,7 @@ export default function PostDetailPage() {
           sourceSummarized: post.sourceSummarized,
           hint: transientPromptHint || undefined,
           modelId: transientModel || undefined,
+          contentType: storyKind.contentType,
         }),
       });
       const data = await response.json();
@@ -719,6 +740,7 @@ export default function PostDetailPage() {
             sourceSummarized: post.sourceSummarized,
             hint: transientPromptHint || undefined,
             modelId: transientModel || undefined,
+            contentType: storyKind.contentType,
           }),
         });
         const promptData = await promptRes.json();
@@ -798,7 +820,7 @@ export default function PostDetailPage() {
               </h1>
               <div className="flex items-center gap-3 mt-1">
                 <span className="text-sm text-muted-foreground truncate">
-                  {contentType === "article" ? "a" : "b"}/{post.slug}
+                  {storyKind.contentType === "article" ? "a" : "b"}/{post.slug}
                 </span>
               </div>
             </div>
@@ -842,6 +864,7 @@ export default function PostDetailPage() {
                           sourceSummarized: post?.sourceSummarized,
                           hint: transientPromptHint || undefined,
                           modelId: transientModel || undefined,
+                          contentType: storyKind.contentType,
                         }),
                       });
                       const promptData = await promptRes.json();
@@ -1299,22 +1322,21 @@ export default function PostDetailPage() {
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Content Type</Label>
                   <Select
-                    value={contentType}
-                    onValueChange={(v) =>
-                      setContentType(v === "article" ? "article" : "blog")
-                    }
+                    value={editorKind}
+                    onValueChange={(v) => setEditorKind(v as EditorKind)}
                   >
                     <SelectTrigger className="bg-secondary/50">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="blog">Blog</SelectItem>
-                      <SelectItem value="article">Article</SelectItem>
+                      <SelectItem value="article">Artikel</SelectItem>
+                      <SelectItem value="blog_short">Blog (Short)</SelectItem>
+                      <SelectItem value="blog_long">Blog (Long)</SelectItem>
                     </SelectContent>
                   </Select>
-                  {contentType !== originalContentType && (
+                  {storyKind.contentType !== originalStoryKind.contentType && (
                     <p className="text-xs text-amber-500/90">
-                      Save to move to {contentType === "article" ? "a/" : "b/"} and convert component in Storyblok.
+                      Save to move to {storyKind.contentType === "article" ? "a/" : "b/"} and convert component in Storyblok.
                     </p>
                   )}
                 </div>

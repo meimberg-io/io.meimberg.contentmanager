@@ -30,7 +30,20 @@ const DEFAULT_PROMPTS: Record<string, string> = {
   teasertitle: `Basierend auf dem Quellmaterial, generiere einen kurzen Teaser-Titel. Dieser wird als Überschrift in der Vorschau / Teaser-Karte angezeigt. Maximal 60 Zeichen. Gib NUR den Titel zurück. Sprache: Deutsch.`,
   abstract: `Basierend auf dem Quellmaterial, schreibe ein kurzes Abstract für den Blogpost. 1-2 Sätze, maximal 120 Zeichen. Sachlich, aber nicht trocken. Subtil eigene Haltung zeigen, ohne aufzutrumpfen. Keine Ausrufezeichen, keine rhetorischen Fragen, keine Wortspiele. Ruhig und klar. Gib NUR den Text zurück. Sprache: Deutsch.`,
   readmoretext: `Basierend auf dem Quellmaterial, generiere einen kurzen "Weiterlesen"-Text. Dieser Text erscheint als Call-to-Action unter dem Teaser. Maximal 50 Zeichen. Gib NUR den Text zurück (z.B. "Mehr über XY erfahren", "Warum XY wichtig ist"). Sprache: Deutsch.`,
-  body: `Basierend auf dem folgenden Quellmaterial, schreibe einen ausführlichen, gut strukturierten Blogartikel.
+  bodyBlogShort: `Basierend auf dem folgenden Quellmaterial, schreibe einen kompakten Blogartikel (Kurzform).
+
+Anforderungen:
+- Strukturiere mit wenigen ##-Überschriften (2–4 Hauptabschnitte); ### nur wenn es wirklich nötig ist
+- Verwende **fett** für wichtige Begriffe und *kursiv* sparsam für Betonungen
+- Aufzählungen mit Bindestrich nur wo sie Klarheit bringen
+- Links aus dem Quellmaterial: [Linktext](URL)
+- Ziel-Länge etwa 350–600 Wörter — prägnant, ohne Fülltext
+- Ton: persönlich und meinungsstark wie beim Blog, aber straff; keine ausschweifenden Absätze
+- Beginne NICHT mit # (Seitentitel ist separat); starte mit einem kurzen Einstieg, dann ##
+
+Sprache: Deutsch.
+Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
+  bodyBlogLong: `Basierend auf dem folgenden Quellmaterial, schreibe einen ausführlichen, gut strukturierten Blogartikel.
 
 Anforderungen:
 - Strukturiere den Artikel mit Überschriften: verwende ## für Hauptabschnitte und ### für Unterabschnitte. Nutze beide Ebenen für eine gute Gliederung.
@@ -61,14 +74,25 @@ Anforderungen:
 
 Sprache: Deutsch.
 Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
-  headerImage: `Basierend auf dem folgenden Quellmaterial, erstelle eine prägnante Bildbeschreibung (Prompt) für ein KI-generiertes Header-Bild eines Blogposts.
+  headerImage: `Basierend auf dem folgenden Quellmaterial, erstelle eine prägnante Bildbeschreibung (Prompt) für ein KI-generiertes Header-Bild eines persönlichen Blogbeitrags.
 
 Anforderungen:
 - Die Beschreibung soll auf Englisch sein (für DALL-E)
-- Beschreibe eine stimmungsvolle, abstrakte oder symbolische Szene, die das Thema visuell einfängt
+- Visuell zum Blogton passen: ausdrucksstärker, stimmungsvoller, eher metaphorisch oder symbolisch; darf ruhig kontrastreicher Lichtstimmung, subjektiver Atmosphäre oder leicht ungewöhnlicher Bildsprache sein — nicht nüchtern-wie-ein-Handbuch
 - Kein Text im Bild
-- Stil: modern, clean, professionell, leicht editorial
-- Farbpalette: harmonisch, nicht zu bunt
+- Stil: modern, editorial, mit eigener visueller Handschrift; nicht generische Stock-Ästhetik
+- Farbpalette: darf emotional wirken; muss nicht zurückhaltend sein
+- Format: Wide banner/header image (landscape orientation)
+- Gib NUR den Bild-Prompt zurück, keine Erklärung
+
+Sprache des Prompts: Englisch.`,
+  headerImageArticle: `Basierend auf dem folgenden Quellmaterial, erstelle eine prägnante Bildbeschreibung (Prompt) für ein KI-generiertes Header-Bild eines sachlichen Fachartikels (nicht Blog).
+
+Anforderungen:
+- Die Beschreibung soll auf Englisch sein (für DALL-E)
+- Visuell klar von Blog-Headern abweichen: zurückhaltend, dokumentarisch oder „business editorial“; sachliche Symbolik, ruhige Komposition, professionelles Magazin-/Reportage-Gefühl
+- Kein Text im Bild
+- Stil: clean, seriös, zurückhaltende Farbpalette, keine dramatische Stimmungsinszenierung
 - Format: Wide banner/header image (landscape orientation)
 - Gib NUR den Bild-Prompt zurück, keine Erklärung
 
@@ -81,9 +105,11 @@ const PROMPT_FIELDS: { key: string; label: string; description: string }[] = [
   { key: "teasertitle", label: "Teaser Title", description: "Generates the teaser card headline (teasertitle)" },
   { key: "abstract", label: "Abstract", description: "Generates a short summary / abstract" },
   { key: "readmoretext", label: "Read More Text", description: "Generates the call-to-action text (readmoretext)" },
-  { key: "body", label: "Body Article (Blog)", description: "Generates the main body for Blog content type (persönlicher, meinungsstarker Stil)." },
+  { key: "bodyBlogShort", label: "Body — Blog (Short)", description: "Body generation when Meta „Blog (Short)“ is selected (kompakt)." },
+  { key: "bodyBlogLong", label: "Body — Blog (Long)", description: "Body generation when Meta „Blog (Long)“ is selected (ausführlich)." },
   { key: "bodyArticle", label: "Body Article (Artikel)", description: "Generates the main body when content type is Article (sachlich, neutral)." },
-  { key: "headerImage", label: "Header Image (DALL-E)", description: "Meta-prompt: generates a DALL-E image prompt from the source material. The resulting prompt is then sent to DALL-E to create the header picture." },
+  { key: "headerImage", label: "Header Image — Blog (DALL-E)", description: "Meta-prompt for Blog content type: expressive, editorial header imagery." },
+  { key: "headerImageArticle", label: "Header Image — Article (DALL-E)", description: "Meta-prompt for Article content type: restrained, documentary / business editorial style." },
 ];
 
 interface AIModel {
@@ -142,6 +168,9 @@ export default function SettingsPage() {
           const merged: Record<string, string> = {};
           for (const field of PROMPT_FIELDS) {
             merged[field.key] = savedPrompts[field.key] || DEFAULT_PROMPTS[field.key];
+          }
+          if (!merged.bodyBlogLong && savedPrompts.body) {
+            merged.bodyBlogLong = savedPrompts.body;
           }
           setPrompts(merged);
         } else {

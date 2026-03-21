@@ -77,6 +77,8 @@ export interface BlogPostData {
   cm_socialmedia?: boolean
   cm_publer_published_at?: string
   cm_publer_post_ids?: string
+  /** Blog only: welcher Body-Prompt (Short/Long); kein Einfluss auf Story-Typ */
+  cm_blog_variant?: 'short' | 'long'
 }
 
 /** Ensure asset objects have fieldtype so Storyblok accepts them; avoid sending partial assets or raw URLs. */
@@ -303,6 +305,9 @@ export async function updatePost(
   }
   mergedContent.component = storyComponentFromType(targetType)
   sanitizeContentForStoryblok(mergedContent)
+  if (mergedContent.component === 'article') {
+    delete mergedContent.cm_blog_variant
+  }
 
   const storyUpdate: Record<string, any> = {
     content: mergedContent
@@ -312,7 +317,7 @@ export async function updatePost(
     storyUpdate.name = options.storyName
   }
   if (options?.slug) {
-    storyUpdate.slug = options.slug
+    storyUpdate.slug = clampSlugForStoryblok(options.slug)
   }
   if (targetType !== currentComponent) {
     storyUpdate.parent_id = await getFolderIdForContentType(targetType)
@@ -645,12 +650,30 @@ export async function uploadAsset(file: File | Buffer, filename: string) {
   }
 }
 
+/** Storyblok validates story slug max length */
+const STORYBLOK_SLUG_MAX_LENGTH = 250
+
 /**
- * Generate a slug from a name
+ * Normalize for URL slug and clamp to Storyblok limit.
  */
 function generateSlug(name: string): string {
-  return name
+  let s = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+  if (s.length > STORYBLOK_SLUG_MAX_LENGTH) {
+    s = s.slice(0, STORYBLOK_SLUG_MAX_LENGTH).replace(/-+$/g, '')
+  }
+  return s || `post-${Date.now()}`
+}
+
+function clampSlugForStoryblok(slug: string): string {
+  let s = slug
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '')
+    .replace(/^-+|-+$/g, '')
+  if (s.length > STORYBLOK_SLUG_MAX_LENGTH) {
+    s = s.slice(0, STORYBLOK_SLUG_MAX_LENGTH).replace(/-+$/g, '')
+  }
+  return s || `post-${Date.now()}`
 }

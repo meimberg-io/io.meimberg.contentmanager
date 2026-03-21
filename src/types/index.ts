@@ -9,12 +9,20 @@ export interface StatusCheck {
 
 export type PostContentType = 'blog' | 'article'
 
+/** Blog body prompt variant (Storyblok bleibt `blog`; nur KI-Prompt) */
+export type BlogBodyVariant = 'short' | 'long'
+
+/** UI: Artikel vs. Blog-Kurz vs. Blog-Lang */
+export type EditorKind = 'article' | 'blog_short' | 'blog_long'
+
 // Main Blog Post Model
 export interface BlogPost {
   id: string;              // Storyblok UUID
   storyblokId: string;     // Numeric story ID for Management API
   slug: string;            // URL slug
   contentType: PostContentType
+  /** Nur bei contentType blog; steuert Short/Long-Prompt */
+  blogBodyVariant?: BlogBodyVariant
   // Blog content fields
   pagetitle: string;
   pageintro: string;

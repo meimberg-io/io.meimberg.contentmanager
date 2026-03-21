@@ -39,6 +39,7 @@ export async function POST(request: Request) {
       instruction: optimizeInstruction,
       isFullDocument,
       contentType: requestContentType,
+      blogBodyVariant: requestBlogBodyVariant,
     } = body
     // type: 'pagetitle' | 'abstract' | 'pageintro' | 'teasertitle' | 'readmoretext' | 'body' | 'optimize'
 
@@ -104,9 +105,22 @@ export async function POST(request: Request) {
         }
         {
           const isArticle = requestContentType === 'article'
-          genOptions.prompt = isArticle
-            ? (storedPrompts.bodyArticle || DEFAULT_PROMPTS.bodyArticle)
-            : (storedPrompts.body || DEFAULT_PROMPTS.body)
+          if (isArticle) {
+            genOptions.prompt =
+              storedPrompts.bodyArticle || DEFAULT_PROMPTS.bodyArticle
+          } else {
+            const variant =
+              requestBlogBodyVariant === 'short' ? 'short' : 'long'
+            if (variant === 'short') {
+              genOptions.prompt =
+                storedPrompts.bodyBlogShort || DEFAULT_PROMPTS.bodyBlogShort
+            } else {
+              genOptions.prompt =
+                storedPrompts.bodyBlogLong ||
+                storedPrompts.body ||
+                DEFAULT_PROMPTS.bodyBlogLong
+            }
+          }
         }
         result.bodyContent = await generateBody(genOptions)
         break

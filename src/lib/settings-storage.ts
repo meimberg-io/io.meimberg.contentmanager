@@ -11,10 +11,18 @@ export interface AiPrompts {
   teasertitle?: string
   abstract?: string
   readmoretext?: string
+  /** @deprecated Nutze bodyBlogLong; wird als Fallback für „Long“ gelesen */
   body?: string
+  /** Body-Prompt für Blog (Short) */
+  bodyBlogShort?: string
+  /** Body-Prompt für Blog (Long) */
+  bodyBlogLong?: string
   /** Body generation when content type is Article (sachlich, neutral) */
   bodyArticle?: string
+  /** DALL-E meta-prompt for header image when content type is Blog */
   headerImage?: string
+  /** DALL-E meta-prompt for header image when content type is Article */
+  headerImageArticle?: string
 }
 
 export interface Settings {
@@ -45,6 +53,35 @@ Anforderungen:
 
 Sprache: Deutsch.
 Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
+  bodyBlogShort: `Basierend auf dem folgenden Quellmaterial, schreibe einen kompakten Blogartikel (Kurzform).
+
+Anforderungen:
+- Strukturiere mit wenigen ##-Überschriften (2–4 Hauptabschnitte); ### nur wenn es wirklich nötig ist
+- Verwende **fett** für wichtige Begriffe und *kursiv* sparsam für Betonungen
+- Aufzählungen mit Bindestrich nur wo sie Klarheit bringen
+- Links aus dem Quellmaterial: [Linktext](URL)
+- Ziel-Länge etwa 350–600 Wörter — prägnant, ohne Fülltext
+- Ton: persönlich und meinungsstark wie beim Blog, aber straff; keine ausschweifenden Absätze
+- Beginne NICHT mit # (Seitentitel ist separat); starte mit einem kurzen Einstieg, dann ##
+
+Sprache: Deutsch.
+Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
+  bodyBlogLong: `Basierend auf dem folgenden Quellmaterial, schreibe einen ausführlichen, gut strukturierten Blogartikel.
+
+Anforderungen:
+- Strukturiere den Artikel mit Überschriften: verwende ## für Hauptabschnitte und ### für Unterabschnitte. Nutze beide Ebenen für eine gute Gliederung.
+- Verwende **fett** für wichtige Begriffe und Schlüsselwörter
+- Verwende *kursiv* für Betonungen und Fachbegriffe
+- Verwende Aufzählungen mit Bindestrich (- Punkt 1, - Punkt 2) wo sinnvoll, z.B. für Vorteile, Schritte oder Auflistungen
+- Füge relevante Links ein, wenn im Quellmaterial URLs erwähnt werden, im Format [Linktext](URL)
+- Der Artikel sollte 800-1500 Wörter lang sein
+- Schreibe in einem persönlichen, leicht meinungsstarken Ton — so, als würdest du laut für den Leser mitdenken. Nutze rhetorische Fragen, gelegentliche Einschübe in Klammern und bildhafte Redewendungen. Der Stil darf ruhig etwas provokant und nachdenklich sein — nicht zu glatt, nicht zu akademisch.
+- Trau dich, eigene Einordnungen und Meinungen zu formulieren, statt nur neutral zu berichten.
+- Beginne NICHT mit einem Titel oder einer Überschrift der Ebene # (der Seitentitel wird separat generiert)
+- Beginne direkt mit einem einleitenden Absatz, dann folgen die ## Abschnitte
+
+Sprache: Deutsch.
+Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
   bodyArticle: `Basierend auf dem folgenden Quellmaterial, schreibe einen sachlichen, gut strukturierten Fachartikel.
 
 Anforderungen:
@@ -60,14 +97,25 @@ Anforderungen:
 
 Sprache: Deutsch.
 Antworte NUR mit dem Artikeltext in Markdown, keine Erklärung oder Meta-Kommentare.`,
-  headerImage: `Basierend auf dem folgenden Quellmaterial, erstelle eine prägnante Bildbeschreibung (Prompt) für ein KI-generiertes Header-Bild eines Blogposts.
+  headerImage: `Basierend auf dem folgenden Quellmaterial, erstelle eine prägnante Bildbeschreibung (Prompt) für ein KI-generiertes Header-Bild eines persönlichen Blogbeitrags.
 
 Anforderungen:
 - Die Beschreibung soll auf Englisch sein (für DALL-E)
-- Beschreibe eine stimmungsvolle, abstrakte oder symbolische Szene, die das Thema visuell einfängt
+- Visuell zum Blogton passen: ausdrucksstärker, stimmungsvoller, eher metaphorisch oder symbolisch; darf ruhig kontrastreicher Lichtstimmung, subjektiver Atmosphäre oder leicht ungewöhnlicher Bildsprache sein — nicht nüchtern-wie-ein-Handbuch
 - Kein Text im Bild
-- Stil: modern, clean, professionell, leicht editorial
-- Farbpalette: harmonisch, nicht zu bunt
+- Stil: modern, editorial, mit eigener visueller Handschrift; nicht generische Stock-Ästhetik
+- Farbpalette: darf emotional wirken; muss nicht zurückhaltend sein
+- Format: Wide banner/header image (landscape orientation)
+- Gib NUR den Bild-Prompt zurück, keine Erklärung
+
+Sprache des Prompts: Englisch.`,
+  headerImageArticle: `Basierend auf dem folgenden Quellmaterial, erstelle eine prägnante Bildbeschreibung (Prompt) für ein KI-generiertes Header-Bild eines sachlichen Fachartikels (nicht Blog).
+
+Anforderungen:
+- Die Beschreibung soll auf Englisch sein (für DALL-E)
+- Visuell klar von Blog-Headern abweichen: zurückhaltend, dokumentarisch oder „business editorial“; sachliche Symbolik, ruhige Komposition, professionelles Magazin-/Reportage-Gefühl
+- Kein Text im Bild
+- Stil: clean, seriös, zurückhaltende Farbpalette, keine dramatische Stimmungsinszenierung
 - Format: Wide banner/header image (landscape orientation)
 - Gib NUR den Bild-Prompt zurück, keine Erklärung
 

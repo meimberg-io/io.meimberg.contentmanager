@@ -10,12 +10,19 @@ export function transformStoryblokBlog(story: any): BlogPost {
   const component = content.component
   const contentType =
     component === 'article' ? 'article' : 'blog'
+  const blogBodyVariant =
+    contentType === 'blog'
+      ? content.cm_blog_variant === 'short'
+        ? 'short'
+        : 'long'
+      : undefined
 
   return {
     id: story.uuid,
     storyblokId: String(story.id),
     slug: story.slug || '',
     contentType,
+    blogBodyVariant,
     // Blog content fields
     pagetitle: content.pagetitle || '',
     pageintro: content.pageintro || '',

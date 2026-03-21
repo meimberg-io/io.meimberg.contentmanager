@@ -110,6 +110,15 @@ export async function POST(request: Request) {
     const contentType =
       body.contentType === 'article' ? 'article' : 'blog'
 
+    const blogVariantRaw = body.blogBodyVariant
+    const cm_blog_variant =
+      contentType === 'blog' &&
+      (blogVariantRaw === 'short' || blogVariantRaw === 'long')
+        ? blogVariantRaw
+        : contentType === 'blog'
+          ? 'long'
+          : undefined
+
     const result = await createPost({
       name: body.name,
       pagetitle: body.pagetitle || '',
@@ -122,6 +131,7 @@ export async function POST(request: Request) {
       cm_source_summarized: body.source_summarized || '',
       cm_origin: body.cm_origin === 'import' || body.cm_origin === 'create' ? body.cm_origin : undefined,
       contentType,
+      ...(cm_blog_variant ? { cm_blog_variant } : {}),
     })
 
     return NextResponse.json(result)
@@ -143,7 +153,13 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json()
-    const { id, slug: newSlug, contentType: rawContentType, ...updates } = body
+    const {
+      id,
+      slug: newSlug,
+      contentType: rawContentType,
+      blogBodyVariant: rawBlogBodyVariant,
+      ...updates
+    } = body
 
     const options: {
       storyName?: string
@@ -154,6 +170,10 @@ export async function PATCH(request: Request) {
     if (newSlug) options.slug = newSlug
     if (rawContentType === 'article' || rawContentType === 'blog') {
       options.contentType = rawContentType
+    }
+
+    if (rawBlogBodyVariant === 'short' || rawBlogBodyVariant === 'long') {
+      ;(updates as Record<string, unknown>).cm_blog_variant = rawBlogBodyVariant
     }
 
     const result = await updatePost(
