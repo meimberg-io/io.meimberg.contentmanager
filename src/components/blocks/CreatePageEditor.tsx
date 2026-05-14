@@ -33,6 +33,7 @@ import {
 
 const lowlight = createLowlight(common)
 import { cn } from '@/lib/utils'
+import { cleanPastedHTML } from '@/lib/tiptap-paste'
 
 interface CreatePageEditorProps {
   onEditorReady: (editor: Editor) => void
@@ -100,6 +101,7 @@ export function CreatePageEditor({ onEditorReady }: CreatePageEditorProps) {
         class: 'max-w-none min-h-[400px] focus:outline-none px-3 py-2',
         'data-placeholder': 'Write your source material here…',
       },
+      transformPastedHTML: cleanPastedHTML,
     },
   })
 

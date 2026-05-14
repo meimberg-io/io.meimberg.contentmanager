@@ -34,6 +34,7 @@ import {
 
 const lowlight = createLowlight(common);
 import { cn } from "@/lib/utils";
+import { cleanPastedHTML } from "@/lib/tiptap-paste";
 
 // ─── Editor Registry ─────────────────────────────────────────
 // Module-level map so the parent page can access TipTap editor instances by block UID.
@@ -80,9 +81,23 @@ const TIPTAP_TO_SB_TYPES: Record<string, string> = {
 };
 
 /**
+ * Marks the editor schema supports. Storyblok content can carry marks
+ * the schema doesn't know (e.g. `textStyle` with color attrs from pastes).
+ * Unknown marks make TipTap's setContent throw, so we strip them.
+ */
+const SUPPORTED_MARKS = new Set([
+  "bold",
+  "italic",
+  "strike",
+  "code",
+  "link",
+]);
+
+/**
  * Recursively convert node types from Storyblok (snake_case) to TipTap (camelCase).
  * Also maps code_block language between Storyblok's `attrs.class = "language-xxx"`
- * and TipTap CodeBlockLowlight's `attrs.language = "xxx"`.
+ * and TipTap CodeBlockLowlight's `attrs.language = "xxx"`, and drops any marks
+ * the editor schema doesn't define.
  */
 function convertNodeTypes(node: any, typeMap: Record<string, string>): any {
   if (!node || typeof node !== "object") return node;
@@ -107,6 +122,16 @@ function convertNodeTypes(node: any, typeMap: Record<string, string>): any {
       delete attrs.language;
     }
     converted.attrs = attrs;
+  }
+  if (Array.isArray(converted.marks)) {
+    const filtered = converted.marks.filter(
+      (m: any) => m && typeof m.type === "string" && SUPPORTED_MARKS.has(m.type)
+    );
+    if (filtered.length > 0) {
+      converted.marks = filtered;
+    } else {
+      delete converted.marks;
+    }
   }
   if (Array.isArray(converted.content)) {
     converted.content = converted.content.map((child: any) =>
@@ -165,6 +190,7 @@ export function RichtextBlock({ data, onChange, blockUid }: RichtextBlockProps) 
         class:
           "max-w-none min-h-[120px] focus:outline-none px-3 py-2",
       },
+      transformPastedHTML: cleanPastedHTML,
     },
     onUpdate: ({ editor }) => {
       if (suppressUpdate.current) return;
