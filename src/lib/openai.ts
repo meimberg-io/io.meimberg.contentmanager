@@ -468,12 +468,12 @@ export async function generateHeaderImage(dallePrompt: string): Promise<{ base64
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'dall-e-3',
+      model: 'gpt-image-1',
       prompt: dallePrompt,
       n: 1,
-      size: '1792x1024',
-      quality: 'standard',
-      response_format: 'b64_json',
+      size: '1536x1024',
+      quality: 'medium',
+      output_format: 'png',
     }),
   })
 
