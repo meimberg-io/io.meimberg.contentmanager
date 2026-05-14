@@ -1,0 +1,11 @@
+{
+  "projectKey": "MICM",
+  "cloudId": "86465bd6-9d7f-4194-91ab-eea3a8e1f976",
+  "site": "https://meimberg.atlassian.net",
+  "statusNames": {
+    "spec": "Zu Spezifizieren",
+    "ready": "Zu erledigen",
+    "inProgress": "In Arbeit",
+    "done": "Erledigt"
+  }
+}
