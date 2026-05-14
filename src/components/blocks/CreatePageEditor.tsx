@@ -8,6 +8,8 @@ import { TableRow } from '@tiptap/extension-table-row'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { Markdown } from '@tiptap/markdown'
+import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'
+import { common, createLowlight } from 'lowlight'
 import { useEffect } from 'react'
 import {
   Bold,
@@ -25,7 +27,11 @@ import {
   Trash2,
   ArrowDown,
   ArrowRight,
+  Code,
+  Code2,
 } from 'lucide-react'
+
+const lowlight = createLowlight(common)
 import { cn } from '@/lib/utils'
 
 interface CreatePageEditorProps {
@@ -76,7 +82,9 @@ export function CreatePageEditor({ onEditorReady }: CreatePageEditorProps) {
             class: 'text-primary underline',
           },
         },
+        codeBlock: false,
       }),
+      CodeBlockLowlight.configure({ lowlight, defaultLanguage: null }),
       Image,
       Table.configure({ resizable: false }),
       TableRow,
@@ -168,6 +176,20 @@ export function CreatePageEditor({ onEditorReady }: CreatePageEditorProps) {
           title="Blockquote"
         >
           <Quote className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleCode().run()}
+          active={editor.isActive('code')}
+          title="Inline Code"
+        >
+          <Code className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          active={editor.isActive('codeBlock')}
+          title="Code Block"
+        >
+          <Code2 className="h-3.5 w-3.5" />
         </ToolbarButton>
         <div className="w-px h-5 bg-border/50 mx-0.5" />
         <ToolbarButton onClick={setLink} active={editor.isActive('link')} title="Link">

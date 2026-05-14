@@ -131,6 +131,27 @@ function markdownToProsemirror(markdown: string): any {
   while (i < lines.length) {
     const line = lines[i]
 
+    // Fenced code block (``` or ~~~) — captures optional language identifier
+    const fenceMatch = line.match(/^([`~]{3,})\s*([\w-]*)\s*$/)
+    if (fenceMatch) {
+      const fence = fenceMatch[1]
+      const language = fenceMatch[2] || null
+      const codeLines: string[] = []
+      i++
+      while (i < lines.length && !lines[i].startsWith(fence)) {
+        codeLines.push(lines[i])
+        i++
+      }
+      if (i < lines.length) i++ // consume closing fence
+      const codeText = codeLines.join('\n')
+      content.push({
+        type: 'codeBlock',
+        attrs: { language },
+        content: codeText ? [{ type: 'text', text: codeText }] : [],
+      })
+      continue
+    }
+
     // Horizontal rule
     if (/^---+$/.test(line.trim()) || /^\*\*\*+$/.test(line.trim())) {
       content.push({ type: 'horizontalRule' })
@@ -235,7 +256,8 @@ function markdownToProsemirror(markdown: string): any {
       !/^[-*]\s+/.test(lines[i]) &&
       !/^\d+\.\s+/.test(lines[i]) &&
       !/^---+$/.test(lines[i].trim()) &&
-      !/^\*\*\*+$/.test(lines[i].trim())
+      !/^\*\*\*+$/.test(lines[i].trim()) &&
+      !/^[`~]{3,}/.test(lines[i])
     ) {
       paraLines.push(lines[i])
       i++
@@ -309,8 +331,9 @@ function parseMarkdownTable(rows: string[]): any | null {
  */
 function parseInlineMarks(text: string): any[] {
   const nodes: any[] = []
-  // Regex that matches **bold**, *italic*, and [linktext](url)
-  const pattern = /(\*\*(.+?)\*\*|\*(.+?)\*|\[([^\]]+)\]\(([^)]+)\))/g
+  // Regex matches `code`, **bold**, *italic*, [linktext](url).
+  // Inline code is parsed first so its contents are not interpreted further.
+  const pattern = /(`([^`\n]+)`|\*\*(.+?)\*\*|\*(.+?)\*|\[([^\]]+)\]\(([^)]+)\))/g
   let lastIndex = 0
   let match: RegExpExecArray | null
 
@@ -322,28 +345,35 @@ function parseInlineMarks(text: string): any[] {
     }
 
     if (match[2]) {
-      // **bold**
+      // `inline code`
       nodes.push({
         type: 'text',
         text: match[2],
-        marks: [{ type: 'bold' }],
+        marks: [{ type: 'code' }],
       })
     } else if (match[3]) {
-      // *italic*
+      // **bold**
       nodes.push({
         type: 'text',
         text: match[3],
-        marks: [{ type: 'italic' }],
+        marks: [{ type: 'bold' }],
       })
-    } else if (match[4] && match[5]) {
-      // [linktext](url)
+    } else if (match[4]) {
+      // *italic*
       nodes.push({
         type: 'text',
         text: match[4],
+        marks: [{ type: 'italic' }],
+      })
+    } else if (match[5] && match[6]) {
+      // [linktext](url)
+      nodes.push({
+        type: 'text',
+        text: match[5],
         marks: [{
           type: 'link',
           attrs: {
-            href: match[5],
+            href: match[6],
             target: '_blank',
             rel: 'noopener noreferrer nofollow',
           },

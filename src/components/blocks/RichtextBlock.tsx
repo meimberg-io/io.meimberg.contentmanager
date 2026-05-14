@@ -7,6 +7,8 @@ import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableCell } from "@tiptap/extension-table-cell";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { common, createLowlight } from "lowlight";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +28,11 @@ import {
   Plus,
   ArrowDown,
   ArrowRight,
+  Code,
+  Code2,
 } from "lucide-react";
+
+const lowlight = createLowlight(common);
 import { cn } from "@/lib/utils";
 
 // ─── Editor Registry ─────────────────────────────────────────
@@ -75,12 +81,32 @@ const TIPTAP_TO_SB_TYPES: Record<string, string> = {
 
 /**
  * Recursively convert node types from Storyblok (snake_case) to TipTap (camelCase).
+ * Also maps code_block language between Storyblok's `attrs.class = "language-xxx"`
+ * and TipTap CodeBlockLowlight's `attrs.language = "xxx"`.
  */
 function convertNodeTypes(node: any, typeMap: Record<string, string>): any {
   if (!node || typeof node !== "object") return node;
   const converted = { ...node };
-  if (converted.type && typeMap[converted.type]) {
-    converted.type = typeMap[converted.type];
+  const originalType = converted.type;
+  if (originalType && typeMap[originalType]) {
+    converted.type = typeMap[originalType];
+  }
+  if (originalType === "code_block" || originalType === "codeBlock") {
+    const toTiptap = originalType === "code_block";
+    const attrs = { ...(converted.attrs || {}) };
+    if (toTiptap) {
+      // Storyblok -> TipTap: "language-ts" -> "ts"
+      const cls: string | undefined = attrs.class;
+      const match = typeof cls === "string" ? cls.match(/language-([\w-]+)/) : null;
+      attrs.language = match ? match[1] : null;
+      delete attrs.class;
+    } else {
+      // TipTap -> Storyblok: "ts" -> "language-ts"
+      const lang: string | undefined = attrs.language;
+      attrs.class = lang ? `language-${lang}` : "language-plaintext";
+      delete attrs.language;
+    }
+    converted.attrs = attrs;
   }
   if (Array.isArray(converted.content)) {
     converted.content = converted.content.map((child: any) =>
@@ -124,7 +150,9 @@ export function RichtextBlock({ data, onChange, blockUid }: RichtextBlockProps) 
             class: "text-primary underline",
           },
         },
+        codeBlock: false,
       }),
+      CodeBlockLowlight.configure({ lowlight, defaultLanguage: null }),
       Image,
       Table.configure({ resizable: false }),
       TableRow,
@@ -236,6 +264,20 @@ export function RichtextBlock({ data, onChange, blockUid }: RichtextBlockProps) 
           title="Blockquote"
         >
           <Quote className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleCode().run()}
+          active={editor.isActive("code")}
+          title="Inline Code"
+        >
+          <Code className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          active={editor.isActive("codeBlock")}
+          title="Code Block"
+        >
+          <Code2 className="h-3.5 w-3.5" />
         </ToolbarButton>
         <div className="w-px h-5 bg-border/50 mx-0.5" />
         <ToolbarButton onClick={setLink} active={editor.isActive("link")} title="Link">
