@@ -54,6 +54,7 @@ Content model:
 - **Confirmations/dialogs**: use the existing `AlertDialog` / `Dialog` components. **Never** use native `window.confirm` / `alert` / `prompt` in app UI. Destructive actions (delete/unpublish/reset) must show a modal confirm.
 - **UI stack**: shadcn/ui + Radix + Tailwind (`components.json`, `src/components/ui/`). Follow existing component patterns.
 - After changing Storyblok component schemas, run `make sb-sync` so `src/types/component-types-sb.d.ts` stays in sync (it is CLI-generated — do not hand-edit).
+- **`docs/` holds permanently valid documentation only.** No dated specs, session notes, scratch/issue lists, or transient work-in-progress — that content belongs in the issue tracker (Jira **MICM**), not in `docs/`. Specs live in the issue description (see "Issue tracking").
 
 ## Issue tracking (Jira)
 

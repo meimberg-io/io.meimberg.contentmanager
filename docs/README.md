@@ -27,6 +27,7 @@ Central entry point for all Contentmanager documentation.
 
 To keep docs maintainable and avoid duplication:
 
+- **`docs/` holds permanently valid documentation only** — no dated specs, session notes, or transient work-in-progress. Such content belongs in the issue tracker (Jira MICM), not here.
 - `SETUP-CHECKLIST.md` covers local onboarding only.
 - `GITHUB-SETUP.md` covers one-time CI/CD configuration only.
 - `DEPLOYMENT.md` covers deployment operations only.
