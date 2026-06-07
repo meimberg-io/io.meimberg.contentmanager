@@ -28,11 +28,15 @@ export interface Article {
     | LuxariseManagerConfig
     | LuxarisePicture
     | LuxarisePictureSlideshow
+    | News
+    | Newsfeedlist
+    | Newsletter
     | Page
     | Pagetitle
     | Photos
     | Picture
     | Richtext
+    | Rssfeed
     | Sociallink
     | Soundcloud
     | Stuff
@@ -40,6 +44,7 @@ export interface Article {
     | Tool
     | Video
     | Youtube
+    | LinkedinPost
   )[];
   component: "article";
   _uid: string;
@@ -51,7 +56,7 @@ export interface Articleteaserlist {
   folder?: string;
   limit: string;
   articles?: (ISbStoryData<Article> | string)[];
-  layout: "" | "small" | "wide";
+  layout: "" | "one-column" | "two-column" | "cards";
   component: "articleteaserlist";
   _uid: string;
   [k: string]: unknown;
@@ -59,6 +64,8 @@ export interface Articleteaserlist {
 
 export interface Blog {
   pagetitle?: string;
+  cm_origin?: string;
+  name?: string;
   pageintro?: string;
   date: string;
   headerpicture?: StoryblokAsset;
@@ -83,11 +90,15 @@ export interface Blog {
     | LuxariseManagerConfig
     | LuxarisePicture
     | LuxarisePictureSlideshow
+    | News
+    | Newsfeedlist
+    | Newsletter
     | Page
     | Pagetitle
     | Photos
     | Picture
     | Richtext
+    | Rssfeed
     | Sociallink
     | Soundcloud
     | Stuff
@@ -95,6 +106,7 @@ export interface Blog {
     | Tool
     | Video
     | Youtube
+    | LinkedinPost
   )[];
   cm_content_complete?: boolean;
   cm_content_confirmed_at?: string;
@@ -115,7 +127,7 @@ export interface Blogteaserlist {
   folder?: string;
   limit: string;
   articles?: (ISbStoryData<Blog> | string)[];
-  layout: "" | "small" | "wide";
+  layout: "" | "one-column" | "two-column" | "cards";
   component: "blogteaserlist";
   _uid: string;
   [k: string]: unknown;
@@ -164,11 +176,15 @@ export interface Grid2Column {
     | LuxariseManagerConfig
     | LuxarisePicture
     | LuxarisePictureSlideshow
+    | News
+    | Newsfeedlist
+    | Newsletter
     | Page
     | Pagetitle
     | Photos
     | Picture
     | Richtext
+    | Rssfeed
     | Sociallink
     | Soundcloud
     | Stuff
@@ -176,6 +192,7 @@ export interface Grid2Column {
     | Tool
     | Video
     | Youtube
+    | LinkedinPost
   )[];
   col2?: (
     | Article
@@ -193,11 +210,15 @@ export interface Grid2Column {
     | LuxariseManagerConfig
     | LuxarisePicture
     | LuxarisePictureSlideshow
+    | News
+    | Newsfeedlist
+    | Newsletter
     | Page
     | Pagetitle
     | Photos
     | Picture
     | Richtext
+    | Rssfeed
     | Sociallink
     | Soundcloud
     | Stuff
@@ -205,6 +226,7 @@ export interface Grid2Column {
     | Tool
     | Video
     | Youtube
+    | LinkedinPost
   )[];
   component: "grid_2column";
   _uid: string;
@@ -229,11 +251,15 @@ export interface Grouping {
     | LuxariseManagerConfig
     | LuxarisePicture
     | LuxarisePictureSlideshow
+    | News
+    | Newsfeedlist
+    | Newsletter
     | Page
     | Pagetitle
     | Photos
     | Picture
     | Richtext
+    | Rssfeed
     | Sociallink
     | Soundcloud
     | Stuff
@@ -241,6 +267,7 @@ export interface Grouping {
     | Tool
     | Video
     | Youtube
+    | LinkedinPost
   )[];
   component: "grouping";
   _uid: string;
@@ -316,6 +343,34 @@ export interface LuxarisePictureSlideshow {
   [k: string]: unknown;
 }
 
+export interface News {
+  pagetitle?: string;
+  pageintro?: string;
+  feeds?: Rssfeed[];
+  component: "news";
+  _uid: string;
+  [k: string]: unknown;
+}
+
+export interface Newsfeedlist {
+  feeds?: Rssfeed[];
+  limit?: string;
+  pagesize?: string;
+  variant?: "" | "compact" | "full";
+  component: "newsfeedlist";
+  _uid: string;
+  [k: string]: unknown;
+}
+
+export interface Newsletter {
+  title?: string;
+  description?: string;
+  variant?: "" | "default" | "highlight";
+  component: "newsletter";
+  _uid: string;
+  [k: string]: unknown;
+}
+
 export interface Page {
   pagetitle?: string;
   pageintro?: string;
@@ -336,11 +391,15 @@ export interface Page {
     | LuxariseManagerConfig
     | LuxarisePicture
     | LuxarisePictureSlideshow
+    | News
+    | Newsfeedlist
+    | Newsletter
     | Page
     | Pagetitle
     | Photos
     | Picture
     | Richtext
+    | Rssfeed
     | Sociallink
     | Soundcloud
     | Stuff
@@ -348,6 +407,7 @@ export interface Page {
     | Tool
     | Video
     | Youtube
+    | LinkedinPost
   )[];
   hidepagetitle?: boolean;
   component: "page";
@@ -382,6 +442,15 @@ export interface Picture {
 export interface Richtext {
   content?: StoryblokRichtext;
   component: "richtext";
+  _uid: string;
+  [k: string]: unknown;
+}
+
+export interface Rssfeed {
+  name: string;
+  url: string;
+  icon?: StoryblokAsset;
+  component: "rssfeed";
   _uid: string;
   [k: string]: unknown;
 }
@@ -425,11 +494,15 @@ export interface Stuff {
     | LuxariseManagerConfig
     | LuxarisePicture
     | LuxarisePictureSlideshow
+    | News
+    | Newsfeedlist
+    | Newsletter
     | Page
     | Pagetitle
     | Photos
     | Picture
     | Richtext
+    | Rssfeed
     | Sociallink
     | Soundcloud
     | Stuff
@@ -437,6 +510,7 @@ export interface Stuff {
     | Tool
     | Video
     | Youtube
+    | LinkedinPost
   )[];
   Teaser?: unknown;
   teasertitle?: string;
@@ -480,6 +554,23 @@ export interface Youtube {
   [k: string]: unknown;
 }
 
+export interface LinkedinPost {
+  linkedin_text?: string;
+  linkedin_image?: StoryblokAsset;
+  cm_blog_ref?: string;
+  cm_source_raw?: string;
+  cm_source_summarized?: string;
+  cm_ai_hint?: string;
+  cm_origin?: "" | "import" | "create";
+  cm_content_complete?: boolean;
+  cm_content_confirmed_at?: string;
+  cm_publer_published_at?: string;
+  cm_publer_post_ids?: string;
+  component: "linkedin_post";
+  _uid: string;
+  [k: string]: unknown;
+}
+
 export type ContentType =
   | Article
   | Blog
@@ -490,6 +581,8 @@ export type ContentType =
   | Linklist
   | LuxariseManagerConfig
   | LuxarisePicture
+  | News
   | Page
   | Sociallink
-  | Stuff;
+  | Stuff
+  | LinkedinPost;

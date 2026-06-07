@@ -217,6 +217,62 @@ async function getFolderIdForContentType(type: CmContentType): Promise<number> {
   return type === 'article' ? getArticleFolderId() : getBlogFolderId()
 }
 
+/**
+ * Get the LinkedIn folder ID (slug `linkedin`) or create it if missing.
+ * LinkedIn posts (component `linkedin_post`) live in their own folder, separate
+ * from blog (`b`) and article (`a`). Created idempotently, analogous to
+ * getBlogFolderId(). Draft-only: linkedin_post stories are never published to
+ * the public website (see MICM-7).
+ */
+export async function getLinkedinFolderId(): Promise<number> {
+  if (!MANAGEMENT_TOKEN) {
+    throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
+  }
+
+  const response = await managementFetch(
+    `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?with_slug=linkedin&is_folder=true`,
+    {
+      headers: {
+        'Authorization': MANAGEMENT_TOKEN,
+        'Content-Type': 'application/json'
+      }
+    }
+  )
+
+  if (response.ok) {
+    const data = await response.json()
+    const folder = data.stories?.find((s: any) => s.is_folder && s.slug === 'linkedin')
+    if (folder) {
+      return folder.id
+    }
+  }
+
+  const createResponse = await managementFetch(
+    `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': MANAGEMENT_TOKEN,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        story: {
+          name: 'linkedin',
+          slug: 'linkedin',
+          is_folder: true
+        }
+      })
+    }
+  )
+
+  if (!createResponse.ok) {
+    throw new Error('Failed to create linkedin folder')
+  }
+
+  const createData = await createResponse.json()
+  return createData.story.id
+}
+
 function storyComponentFromType(type: CmContentType): 'blog' | 'article' {
   return type === 'article' ? 'article' : 'blog'
 }

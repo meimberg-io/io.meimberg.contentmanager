@@ -1,0 +1,75 @@
+{
+  "name": "linkedin_post",
+  "display_name": "LinkedIn Post",
+  "description": "Content-Manager-only LinkedIn post (draft-only, never published to the public website). Either standalone or attached to a blog story via cm_blog_ref.",
+  "is_root": true,
+  "is_nestable": false,
+  "color": "#0a66c2",
+  "icon": "block-share",
+  "schema": {
+    "linkedin_text": {
+      "type": "textarea",
+      "pos": 0,
+      "display_name": "LinkedIn Text",
+      "description": "Post text as plain text with line breaks (no rich text / markdown)."
+    },
+    "linkedin_image": {
+      "type": "asset",
+      "pos": 1,
+      "filetypes": ["images"],
+      "display_name": "LinkedIn Image",
+      "description": "Standalone posts only: single image. Attached posts use the blog Open-Graph link card instead."
+    },
+    "cm_blog_ref": {
+      "type": "text",
+      "pos": 2,
+      "display_name": "Blog reference (UUID)",
+      "description": "Blog story UUID this post is attached to. Empty = standalone. One-directional LinkedIn -> Blog."
+    },
+    "cm_source_raw": {
+      "type": "textarea",
+      "pos": 3,
+      "display_name": "Source (raw)"
+    },
+    "cm_source_summarized": {
+      "type": "textarea",
+      "pos": 4,
+      "display_name": "Source (summarized)"
+    },
+    "cm_ai_hint": {
+      "type": "text",
+      "pos": 5,
+      "display_name": "AI hint"
+    },
+    "cm_origin": {
+      "type": "option",
+      "pos": 6,
+      "display_name": "Origin",
+      "exclude_empty_option": false,
+      "options": [
+        { "name": "Import", "value": "import" },
+        { "name": "Create", "value": "create" }
+      ]
+    },
+    "cm_content_complete": {
+      "type": "boolean",
+      "pos": 7,
+      "display_name": "Content complete"
+    },
+    "cm_content_confirmed_at": {
+      "type": "text",
+      "pos": 8,
+      "display_name": "Content confirmed at (ISO)"
+    },
+    "cm_publer_published_at": {
+      "type": "text",
+      "pos": 9,
+      "display_name": "Publer published at (ISO)"
+    },
+    "cm_publer_post_ids": {
+      "type": "text",
+      "pos": 10,
+      "display_name": "Publer post IDs (comma-separated)"
+    }
+  }
+}
