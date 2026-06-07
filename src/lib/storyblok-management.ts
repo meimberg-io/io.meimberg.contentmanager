@@ -630,6 +630,169 @@ export async function fetchBlogPostsManagement(options?: {
   })
 }
 
+// ─── LinkedIn posts (MICM-8, Variante C) ──────────────────────────────────
+// LinkedIn posts are a separate entity: component `linkedin_post`, folder
+// `linkedin/`, draft-only (never published to the public website). They either
+// stand alone or reference a blog story via cm_blog_ref (blog story UUID).
+// The blog/article path above is intentionally left untouched.
+
+export interface LinkedinPostData {
+  linkedin_text?: string
+  linkedin_image?: any // StoryblokAsset
+  /** Blog story UUID this post is attached to. Empty = standalone. */
+  cm_blog_ref?: string
+  cm_source_raw?: string
+  cm_source_summarized?: string
+  cm_ai_hint?: string
+  cm_origin?: 'import' | 'create'
+  cm_content_complete?: boolean
+  cm_content_confirmed_at?: string
+  cm_publer_published_at?: string
+  cm_publer_post_ids?: string
+}
+
+/** Resolve a story by its UUID via the Management API (list endpoint). Returns the numeric id or null. */
+async function getStoryIdByUuid(uuid: string): Promise<number | null> {
+  if (!MANAGEMENT_TOKEN) {
+    throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
+  }
+  const response = await managementFetch(
+    `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?by_uuids=${encodeURIComponent(uuid)}`,
+    { headers: { 'Authorization': MANAGEMENT_TOKEN, 'Content-Type': 'application/json' } }
+  )
+  if (!response.ok) return null
+  const data = await response.json()
+  const story = (data.stories || [])[0]
+  return story?.id ?? null
+}
+
+/**
+ * Resolve the parent blog story for a LinkedIn post by blog UUID (MICM-8 AK6b).
+ * Returns the full blog story (incl. content, full_slug, publish status) or null.
+ * Consumed by MICM-11 (URL + OG preview) and MICM-12 (publish guard).
+ */
+export async function resolveBlogStoryByUuid(uuid: string) {
+  if (!uuid) return null
+  const id = await getStoryIdByUuid(uuid)
+  if (!id) return null
+  try {
+    return await getPostById(String(id))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Create a new linkedin_post story (draft-only). When attached to a blog
+ * (blogParentUuid set), cm_blog_ref is filled with the blog UUID and the blog's
+ * source material is mirrored into the new story (MICM-8 AK5 + AK8).
+ */
+export async function createLinkedinPost(
+  data: LinkedinPostData & { name: string; blogParentUuid?: string }
+) {
+  if (!MANAGEMENT_TOKEN) {
+    throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
+  }
+
+  const parentId = await getLinkedinFolderId()
+  const { name, blogParentUuid, ...contentFields } = data
+
+  // Mirror source material from the parent blog for attached posts.
+  let mirroredSource: Partial<LinkedinPostData> = {}
+  if (blogParentUuid) {
+    const blog = await resolveBlogStoryByUuid(blogParentUuid)
+    if (blog) {
+      mirroredSource = {
+        cm_source_raw: blog.content?.cm_source_raw,
+        cm_source_summarized: blog.content?.cm_source_summarized,
+      }
+    }
+  }
+
+  const content: Record<string, any> = {
+    component: 'linkedin_post',
+    ...mirroredSource,
+    ...contentFields,
+    ...(blogParentUuid ? { cm_blog_ref: blogParentUuid } : {}),
+  }
+  content.linkedin_image = ensureAssetField(content.linkedin_image)
+
+  const response = await managementFetch(
+    `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': MANAGEMENT_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        story: {
+          name,
+          slug: generateSlug(name),
+          content,
+          parent_id: parentId,
+        },
+        // No publish: 1 — draft only
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(`Failed to create LinkedIn post: ${JSON.stringify(error)}`)
+  }
+
+  return await response.json()
+}
+
+/**
+ * Update an existing linkedin_post story (draft-only). Merges into existing content.
+ */
+export async function updateLinkedinPost(
+  storyId: string,
+  data: Partial<LinkedinPostData>,
+  options?: { storyName?: string; slug?: string }
+) {
+  if (!MANAGEMENT_TOKEN) {
+    throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
+  }
+
+  const currentStory = await getPostById(storyId)
+
+  const mergedContent: Record<string, any> = {
+    ...currentStory.content,
+    ...data,
+    component: 'linkedin_post',
+  }
+  mergedContent.linkedin_image = ensureAssetField(mergedContent.linkedin_image)
+
+  const storyUpdate: Record<string, any> = { content: mergedContent }
+  if (options?.storyName) storyUpdate.name = options.storyName
+  if (options?.slug) storyUpdate.slug = clampSlugForStoryblok(options.slug)
+
+  const response = await managementFetch(
+    `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories/${storyId}`,
+    {
+      method: 'PUT',
+      headers: { 'Authorization': MANAGEMENT_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ story: storyUpdate }),
+      // No publish: 1 — draft only
+    }
+  )
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: response.statusText }))
+    throw new Error(`Failed to update LinkedIn post: ${error.error || response.statusText}`)
+  }
+
+  return await response.json()
+}
+
+/**
+ * Fetch a single linkedin_post story by numeric story ID (full content + publish status).
+ * Authoritative single read (used by the detail page and the AI/Publer write paths).
+ */
+export async function getLinkedinPostById(storyId: string) {
+  return await getPostById(storyId)
+}
+
 /**
  * Upload an asset (image) to Storyblok
  */

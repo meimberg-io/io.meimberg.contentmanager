@@ -125,6 +125,56 @@ export async function fetchPostByUuid(uuid: string) {
   return data.stories[0]
 }
 
+// ─── LinkedIn posts read side (MICM-8, Variante C) ─────────────────────────
+// LinkedIn posts live in the `linkedin/` folder, component `linkedin_post`,
+// draft-only. They are read via the CDN draft API (full content in one call).
+// Kept separate from the blog list — no mixing of folders/components.
+
+/** Fetch all linkedin_post stories (folder `linkedin/`). */
+export async function fetchLinkedinPosts(options?: { perPage?: number; page?: number }) {
+  const storyblokApi = getStoryblokApi()
+  const perPage = options?.perPage || 100
+  const page = options?.page || 1
+
+  const cacheOpt: { cache: RequestCache } = {
+    cache: process.env.NEXT_PUBLIC_STORYBLOK_DISABLECACHING ? 'no-cache' : 'default',
+  }
+
+  const result = await storyblokApi.get('cdn/stories', {
+    version: 'draft',
+    starts_with: 'linkedin/',
+    filter_query: { component: { in: 'linkedin_post' } },
+    per_page: perPage,
+    page,
+    sort_by: 'created_at:desc',
+  } as ISbStoriesParams, cacheOpt)
+
+  const stories = result.data?.stories || []
+  return { stories, total: stories.length }
+}
+
+/** Find the LinkedIn posts attached to a given blog story (MICM-8 AK6a): cm_blog_ref == blog UUID. */
+export async function fetchLinkedinPostsByBlogUuid(blogUuid: string) {
+  if (!blogUuid) return []
+  const storyblokApi = getStoryblokApi()
+
+  const cacheOpt: { cache: RequestCache } = {
+    cache: process.env.NEXT_PUBLIC_STORYBLOK_DISABLECACHING ? 'no-cache' : 'default',
+  }
+
+  const result = await storyblokApi.get('cdn/stories', {
+    version: 'draft',
+    starts_with: 'linkedin/',
+    filter_query: {
+      component: { in: 'linkedin_post' },
+      cm_blog_ref: { is: blogUuid },
+    },
+    per_page: 100,
+  } as ISbStoriesParams, cacheOpt)
+
+  return result.data?.stories || []
+}
+
 // Get statistics for dashboard
 export async function fetchStatistics() {
   const allPosts = await fetchBlogPosts({ perPage: 1000 })

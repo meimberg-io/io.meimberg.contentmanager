@@ -55,6 +55,44 @@ export interface BlogPost {
   lastModified: string;
 }
 
+/**
+ * LinkedIn Post Model (MICM-8, Variante C).
+ *
+ * A LinkedIn post is its own entity, stored as a `linkedin_post` story in the
+ * `linkedin/` folder (draft-only, never published to the public website).
+ * It either stands alone or references a blog story as its parent via
+ * `blogParentUuid` (one-directional LinkedIn -> Blog). The BlogPost type is
+ * intentionally left unchanged.
+ */
+export interface LinkedinPost {
+  id: string;              // Storyblok UUID
+  storyblokId: string;     // Numeric story ID for Management API
+  slug: string;            // URL slug (folder-internal, not public)
+  name: string;            // Story name
+  // Content
+  linkedinText: string;    // Plain text with line breaks
+  linkedinImage?: string;  // Asset URL (standalone posts only)
+  // Source material (mirrored from the parent blog for attached posts)
+  sourceRaw?: string;
+  sourceSummarized?: string;
+  aiHint?: string;
+  // Origin: how the post was created
+  origin?: 'import' | 'create';
+  // Parent reference — empty/undefined = standalone, set = attached to a blog
+  blogParentUuid?: string;
+  // Status
+  status: {
+    contentComplete: StatusCheck;
+    publishedLinkedIn: StatusCheck;
+  };
+  // Publer
+  publerPostIds?: string[];
+  publerPublishedAt?: string;
+  // Timestamps
+  createdAt: string;
+  lastModified: string;
+}
+
 // User Type
 export interface User {
   id: string;

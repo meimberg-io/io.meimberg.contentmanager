@@ -2,7 +2,7 @@
  * Transform Storyblok story data to our BlogPost type
  */
 
-import { BlogPost } from '@/types'
+import { BlogPost, LinkedinPost } from '@/types'
 
 export function transformStoryblokBlog(story: any): BlogPost {
   const content = story.content || {}
@@ -66,6 +66,66 @@ export function transformStoryblokBlog(story: any): BlogPost {
     createdAt: story.created_at,
     lastModified: story.updated_at || story.created_at,
   }
+}
+
+/**
+ * Transform a Storyblok `linkedin_post` story into our LinkedinPost type (MICM-8).
+ * Kept separate from the blog transform — no mixing of folders/components.
+ */
+export function transformStoryblokLinkedin(story: any): LinkedinPost {
+  const content = story.content || {}
+
+  const linkedinText = content.linkedin_text || ''
+  const blogParentUuid = content.cm_blog_ref || undefined
+  const publishedLinkedIn = !!content.cm_publer_published_at
+
+  return {
+    id: story.uuid,
+    storyblokId: String(story.id),
+    slug: story.slug || '',
+    name: story.name || '',
+    linkedinText,
+    linkedinImage: content.linkedin_image?.filename || undefined,
+    sourceRaw: content.cm_source_raw || undefined,
+    sourceSummarized: content.cm_source_summarized || undefined,
+    aiHint: content.cm_ai_hint || undefined,
+    origin: content.cm_origin === 'import' || content.cm_origin === 'create' ? content.cm_origin : undefined,
+    blogParentUuid,
+    status: {
+      contentComplete: {
+        completed: !!content.cm_content_complete,
+        timestamp: content.cm_content_confirmed_at || undefined,
+        color: getLinkedinContentCompleteColor(content),
+      },
+      publishedLinkedIn: {
+        completed: publishedLinkedIn,
+        timestamp: content.cm_publer_published_at || undefined,
+        // Activated in MICM-12 (Publer); gray placeholder until then.
+        color: publishedLinkedIn ? 'green' : 'gray',
+      },
+    },
+    publerPostIds: content.cm_publer_post_ids
+      ? content.cm_publer_post_ids.split(',').map((id: string) => id.trim()).filter(Boolean)
+      : undefined,
+    publerPublishedAt: content.cm_publer_published_at || undefined,
+    createdAt: story.created_at,
+    lastModified: story.updated_at || story.created_at,
+  }
+}
+
+/**
+ * Content-complete color for LinkedIn posts (MICM-10 definition):
+ * green = manually confirmed; yellow = text present but unconfirmed; red = no text.
+ * Unlike blog there is no 9-field criterion — a LinkedIn post has only the text field.
+ */
+function getLinkedinContentCompleteColor(content: any): 'green' | 'yellow' | 'red' | 'gray' {
+  if (content?.cm_content_complete) {
+    return 'green'
+  }
+  if (content?.linkedin_text && String(content.linkedin_text).trim()) {
+    return 'yellow'
+  }
+  return 'red'
 }
 
 function getContentCompleteColor(content: any): 'green' | 'yellow' | 'red' | 'gray' {
