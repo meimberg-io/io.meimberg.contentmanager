@@ -7,9 +7,10 @@ import {
   generateTeaserTitle,
   generateReadMoreText,
   generateBody,
+  generateLinkedinText,
   optimizeText,
 } from '@/lib/openai'
-import { updatePost } from '@/lib/storyblok-management'
+import { updatePost, updateLinkedinPost } from '@/lib/storyblok-management'
 import { getSettings, DEFAULT_PROMPTS } from '@/lib/settings-storage'
 import { isModelAvailable, DEFAULT_MODEL } from '@/lib/ai-provider'
 
@@ -123,6 +124,20 @@ export async function POST(request: Request) {
           }
         }
         result.bodyContent = await generateBody(genOptions)
+        break
+
+      case 'linkedin':
+        if (!sourceRaw && !sourceSummarized) {
+          return NextResponse.json({
+            error: 'Source material is required for LinkedIn generation'
+          }, { status: 400 })
+        }
+        genOptions.prompt = storedPrompts.linkedin || DEFAULT_PROMPTS.linkedin
+        result.linkedin = await generateLinkedinText(genOptions)
+        // Persist via the LinkedIn path (NOT updatePost — that is the blog path).
+        if (storyId) {
+          await updateLinkedinPost(storyId, { linkedin_text: result.linkedin })
+        }
         break
 
       case 'optimize':

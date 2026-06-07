@@ -97,6 +97,20 @@ Anforderungen:
 - Gib NUR den Bild-Prompt zurück, keine Erklärung
 
 Sprache des Prompts: Englisch.`,
+  linkedin: `Basierend auf dem folgenden Quellmaterial, schreibe einen publikationsreifen LinkedIn-Beitrag.
+
+Anforderungen:
+- Beginne mit einem starken Hook in der ersten Zeile, der zum Weiterlesen anregt.
+- Schreibe in kurzen Absätzen, getrennt durch Leerzeilen — gut lesbar im LinkedIn-Feed.
+- Persönlicher, meinungsstarker Ton; eigene Einordnung statt nüchterner Bericht.
+- Schließe mit einem klaren Call-to-Action (z. B. eine Frage an die Leser oder eine Einladung zur Diskussion).
+- Ziel-Länge etwa 1300 Zeichen, maximal 3000 Zeichen.
+- KEINE Hashtags.
+- KEINE Links und keine Verweise auf einen Blogartikel (die Verlinkung passiert separat).
+- Reiner Plain-Text mit Zeilenumbrüchen, KEIN Markdown, keine Überschriften, keine **fett**/*kursiv*-Formatierung.
+
+Sprache: Deutsch.
+Antworte NUR mit dem LinkedIn-Beitragstext, keine Erklärung oder Meta-Kommentare.`,
 };
 
 const PROMPT_FIELDS: { key: string; label: string; description: string }[] = [
@@ -110,6 +124,7 @@ const PROMPT_FIELDS: { key: string; label: string; description: string }[] = [
   { key: "bodyArticle", label: "Body Article (Artikel)", description: "Generates the main body when content type is Article (sachlich, neutral)." },
   { key: "headerImage", label: "Header Image — Blog (DALL-E)", description: "Meta-prompt for Blog content type: expressive, editorial header imagery." },
   { key: "headerImageArticle", label: "Header Image — Article (DALL-E)", description: "Meta-prompt for Article content type: restrained, documentary / business editorial style." },
+  { key: "linkedin", label: "LinkedIn Post", description: "Generates the LinkedIn post text (plain text, hook + short paragraphs + CTA, no hashtags/links)." },
 ];
 
 interface AIModel {

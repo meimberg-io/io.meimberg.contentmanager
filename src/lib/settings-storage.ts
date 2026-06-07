@@ -23,6 +23,8 @@ export interface AiPrompts {
   headerImage?: string
   /** DALL-E meta-prompt for header image when content type is Article */
   headerImageArticle?: string
+  /** LinkedIn post text generation (plain text, LinkedIn style) */
+  linkedin?: string
 }
 
 export interface Settings {
@@ -120,6 +122,20 @@ Anforderungen:
 - Gib NUR den Bild-Prompt zurück, keine Erklärung
 
 Sprache des Prompts: Englisch.`,
+  linkedin: `Basierend auf dem folgenden Quellmaterial, schreibe einen publikationsreifen LinkedIn-Beitrag.
+
+Anforderungen:
+- Beginne mit einem starken Hook in der ersten Zeile, der zum Weiterlesen anregt.
+- Schreibe in kurzen Absätzen, getrennt durch Leerzeilen — gut lesbar im LinkedIn-Feed.
+- Persönlicher, meinungsstarker Ton; eigene Einordnung statt nüchterner Bericht.
+- Schließe mit einem klaren Call-to-Action (z. B. eine Frage an die Leser oder eine Einladung zur Diskussion).
+- Ziel-Länge etwa 1300 Zeichen, maximal 3000 Zeichen.
+- KEINE Hashtags.
+- KEINE Links und keine Verweise auf einen Blogartikel (die Verlinkung passiert separat).
+- Reiner Plain-Text mit Zeilenumbrüchen, KEIN Markdown, keine Überschriften, keine **fett**/*kursiv*-Formatierung.
+
+Sprache: Deutsch.
+Antworte NUR mit dem LinkedIn-Beitragstext, keine Erklärung oder Meta-Kommentare.`,
 }
 
 /**

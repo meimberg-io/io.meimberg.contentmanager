@@ -399,6 +399,18 @@ function parseInlineMarks(text: string): any[] {
 }
 
 /**
+ * Generate a LinkedIn post text from source material (MICM-9).
+ * Returns trimmed plain text with line breaks — LinkedIn is plain text, so there
+ * is intentionally NO markdown-to-ProseMirror conversion (unlike generateBody).
+ */
+export async function generateLinkedinText(options: BlogGenerationOptions): Promise<string> {
+  const prompt = options.prompt || DEFAULT_PROMPTS.linkedin
+  const fullPrompt = buildFullPrompt(options.sourceRaw, options.sourceSummarized, prompt, options.hint)
+  const response = await callAI({ prompt: fullPrompt, modelId: options.modelId })
+  return response.trim()
+}
+
+/**
  * Optimize text based on a user instruction.
  * If isFullDocument is true, the AI is told to return markdown and the result
  * is converted to ProseMirror JSON.  Otherwise plain text is returned.
