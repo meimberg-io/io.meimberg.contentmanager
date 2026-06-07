@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 // Routes that require authentication
-const protectedRoutes = ['/dashboard', '/posts', '/import', '/settings', '/api/posts', '/api/publishing', '/api/import', '/api/ai']
+const protectedRoutes = ['/dashboard', '/posts', '/linkedin', '/import', '/settings', '/api/posts', '/api/linkedin', '/api/publishing', '/api/import', '/api/ai']
 
 // Public routes that don't require auth
 const publicRoutes = ['/login', '/api/auth']

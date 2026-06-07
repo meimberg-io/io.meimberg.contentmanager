@@ -75,6 +75,7 @@ function deriveSlug(title: string): string {
 }
 
 import { getRichtextEditor } from "@/components/blocks/RichtextBlock";
+import { BlogLinkedinSection } from "@/components/linkedin/BlogLinkedinSection";
 
 // Dynamic import BodyEditor to avoid SSR issues with dnd-kit/tiptap
 const BodyEditor = dynamic(
@@ -987,6 +988,14 @@ export default function PostDetailPage() {
           </div>
           <BodyEditor blocks={bodyBlocks} onChange={setBodyBlocks} />
         </div>
+
+        {/* LinkedIn area (MICM-10) — attached LinkedIn posts + create/attach */}
+        <BlogLinkedinSection
+          blogUuid={post.id}
+          blogSlug={post.slug}
+          blogContentType={storyKind.contentType}
+          blogTitle={form.pagetitle || post.pagetitle || post.slug}
+        />
 
         {/* Actions moved to sidebar Status panel */}
       </div>

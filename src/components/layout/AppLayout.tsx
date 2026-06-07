@@ -9,11 +9,12 @@ import {
   PlusCircle,
   Upload, 
   FileText, 
-  Settings, 
+  Settings,
   LogOut,
   Search,
   Menu,
   X,
+  Linkedin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ const navItems = [
   { label: "Create", icon: PlusCircle, path: "/create" },
   { label: "Import", icon: Upload, path: "/import" },
   { label: "All Posts", icon: FileText, path: "/posts" },
+  { label: "LinkedIn", icon: Linkedin, path: "/linkedin" },
   { label: "Settings", icon: Settings, path: "/settings" },
 ];
 
