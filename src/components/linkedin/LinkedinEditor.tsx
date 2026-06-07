@@ -39,6 +39,7 @@ import {
   Upload,
   X,
   AlertTriangle,
+  Send,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,8 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
   const [showSource, setShowSource] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,6 +85,18 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
     text !== (post.linkedinText || "") ||
     sourceSummarized !== (post.sourceSummarized || "") ||
     imageUrl !== post.linkedinImage;
+
+  const isPublished = post.status.publishedLinkedIn.completed;
+  // Publish guard (MICM-12 AK6): attached posts require a published parent blog.
+  const blockedReason = !post.linkedinText.trim()
+    ? "Add and save LinkedIn text first"
+    : dirty
+      ? "Save your changes before publishing"
+      : isAttached && parent && !parent.published
+        ? "Parent blog is not published yet"
+        : isAttached && !parent
+          ? "Parent blog could not be resolved"
+          : null;
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -210,6 +225,26 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
     }
   };
 
+  const handlePublish = async () => {
+    setPublishing(true);
+    try {
+      const response = await fetch("/api/publishing/linkedin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: post.storyblokId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Publish failed");
+      toast({ title: "Published to LinkedIn", description: data.message });
+      setConfirmPublishOpen(false);
+      onChanged?.();
+    } catch (error: any) {
+      toast({ title: "Publish failed", description: error.message, variant: "destructive" });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   return (
     <div className={cn("space-y-3 rounded-lg border border-border/50 bg-card p-4", compact && "bg-secondary/10")}>
       {/* Header: status + parent marker */}
@@ -225,8 +260,19 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
             }
             color={post.status.contentComplete.color}
           />
-          {/* publishedLinkedIn — gray placeholder until MICM-12 */}
-          <LinkedinStatusDot label="Not published (Publer)" color="gray" />
+          {/* publishedLinkedIn — real status (MICM-12) */}
+          <LinkedinStatusDot
+            label={
+              isPublished
+                ? `On LinkedIn${
+                    post.status.publishedLinkedIn.timestamp
+                      ? " · " + new Date(post.status.publishedLinkedIn.timestamp).toLocaleDateString()
+                      : ""
+                  }`
+                : "Not published"
+            }
+            color={post.status.publishedLinkedIn.color}
+          />
         </div>
 
         {isAttached && parent && (
@@ -380,6 +426,16 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save
           </Button>
+          <Button
+            size="sm"
+            className="gap-2 bg-[#0a66c2] hover:bg-[#0a66c2]/90 text-white"
+            onClick={() => setConfirmPublishOpen(true)}
+            disabled={publishing || !!blockedReason}
+            title={blockedReason || (isPublished ? "Re-publish (replaces the queued post)" : "Publish to LinkedIn via Publer")}
+          >
+            {publishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            {isPublished ? "Re-publish" : "Publish"}
+          </Button>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -420,6 +476,34 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
           </Button>
         </div>
       </div>
+
+      {blockedReason && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 text-right">{blockedReason}</p>
+      )}
+
+      <AlertDialog open={confirmPublishOpen} onOpenChange={setConfirmPublishOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isPublished ? "Re-publish to LinkedIn?" : "Publish to LinkedIn?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isPublished
+                ? "If this post is still in the Publer queue it will be replaced (no duplicate). If it has already been delivered, publishing is blocked."
+                : "This schedules the post to the end of your LinkedIn queue via Publer."}
+              {isAttached && " The published blog link will be appended automatically."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={publishing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handlePublish}
+              disabled={publishing}
+              className="bg-[#0a66c2] hover:bg-[#0a66c2]/90 text-white"
+            >
+              {publishing ? "Publishing..." : isPublished ? "Re-publish" : "Publish"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>

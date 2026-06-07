@@ -71,10 +71,10 @@ export function LinkedinCard({ post, parent }: LinkedinCardProps) {
         <span className="text-xs text-muted-foreground whitespace-nowrap">
           {post.lastModified ? new Date(post.lastModified).toLocaleDateString() : ""}
         </span>
-        {/* contentComplete (active) + publishedLinkedIn (gray placeholder until MICM-12) */}
+        {/* contentComplete + publishedLinkedIn (Publer) */}
         <div className="flex items-center gap-1.5">
           <StatusDotIcon color={post.status.contentComplete.color} />
-          <StatusDotIcon color="gray" />
+          <StatusDotIcon color={post.status.publishedLinkedIn.color} />
         </div>
       </div>
     </div>

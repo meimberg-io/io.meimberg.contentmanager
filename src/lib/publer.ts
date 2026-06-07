@@ -6,9 +6,10 @@
 const PUBLER_API_KEY = process.env.PUBLER_API_KEY
 const PUBLER_API_URL = process.env.PUBLER_API_URL || 'https://app.publer.com/api/v1'
 const PUBLER_WORKSPACE_ID = process.env.PUBLER_WORKSPACE_ID
+const PUBLER_LINKEDIN_ACCOUNT_ID = process.env.PUBLER_LINKEDIN_ACCOUNT_ID
 
-// Channel types
-export type PubChannel = 'instagram' | 'facebook' | 'pinterest' | 'twitter' | 'threads'
+// Channel types ('linkedin' added in MICM-12 as a named channel + formatter slot)
+export type PubChannel = 'instagram' | 'facebook' | 'pinterest' | 'twitter' | 'threads' | 'linkedin'
 
 // Post data for each channel
 export interface ChannelPost {
@@ -555,6 +556,180 @@ export function isPublerConfigured(): boolean {
  */
 export function isPublerFullyConfigured(): boolean {
   return !!PUBLER_API_KEY && !!PUBLER_WORKSPACE_ID
+}
+
+// ─── LinkedIn channel (MICM-12) ────────────────────────────────────────────
+// Real Publer integration for LinkedIn only. The shop multi-channel code above
+// (createScheduledPosts etc.) is intentionally left untouched. LinkedIn is added
+// as a named channel with its own formatter + scheduler, no premature abstraction.
+
+/** LinkedIn text limit (~3000 chars). */
+export const LINKEDIN_TEXT_LIMIT = 3000
+
+/** The configured LinkedIn account id (env, deterministic across multiple accounts). */
+export function getLinkedinAccountId(): string | undefined {
+  return PUBLER_LINKEDIN_ACCOUNT_ID
+}
+
+/** LinkedIn publishing requires full Publer config + an explicit LinkedIn account id. */
+export function isLinkedinPublerConfigured(): boolean {
+  return isPublerFullyConfigured() && !!PUBLER_LINKEDIN_ACCOUNT_ID
+}
+
+/**
+ * Format a LinkedIn post (MICM-12 AK1). Plain text with line breaks; for attached
+ * posts the freshly resolved blog URL is appended at the end (triggers the OG link
+ * preview card). Respects the ~3000 char limit. Standalone: no link appended.
+ */
+export function formatForLinkedIn(text: string, blogUrl?: string): string {
+  let body = (text || '').trim()
+  if (blogUrl) {
+    const suffix = `\n\n${blogUrl}`
+    if (body.length + suffix.length > LINKEDIN_TEXT_LIMIT) {
+      body = truncateText(body, LINKEDIN_TEXT_LIMIT - suffix.length)
+    }
+    return `${body}${suffix}`
+  }
+  if (body.length > LINKEDIN_TEXT_LIMIT) {
+    body = truncateText(body, LINKEDIN_TEXT_LIMIT)
+  }
+  return body
+}
+
+/** Extract the real Publer post IDs from a completed schedule job (MICM-12 AK4). */
+function extractPublerPostIds(jobResult: any): string[] {
+  const ids: string[] = []
+  const collect = (arr: any[]) => {
+    for (const p of arr) {
+      const id = p?.id || p?.post_id
+      if (id) ids.push(String(id))
+    }
+  }
+  const payload = jobResult?.payload ?? jobResult
+  if (Array.isArray(payload)) collect(payload)
+  else if (Array.isArray(payload?.posts)) collect(payload.posts)
+  else if (Array.isArray(payload?.ids)) ids.push(...payload.ids.map(String))
+  else if (payload?.id) ids.push(String(payload.id))
+  return ids
+}
+
+/**
+ * Schedule a single LinkedIn post to the end of the queue (MICM-12 AK3).
+ * - With mediaUrl (standalone image): upload via uploadMediaFromUrl, type 'photo'.
+ * - Without media: type 'status' (text-only; an appended link unfurls into a card).
+ * Returns the job id and the real Publer post ids extracted from the job result.
+ */
+export async function scheduleLinkedinPost(params: {
+  text: string
+  accountId: string
+  mediaUrl?: string
+  mediaName?: string
+}): Promise<{ jobId: string; postIds: string[] }> {
+  const headers = getPubHeaders()
+  const { text, accountId, mediaUrl, mediaName } = params
+
+  let media: Array<{ id: string; type: string }> | undefined
+  if (mediaUrl) {
+    const mediaId = await uploadMediaFromUrl(mediaUrl, mediaName || 'linkedin-image')
+    media = [{ id: mediaId, type: 'image' }]
+  }
+
+  const networkConfig: Record<string, any> = {
+    type: media ? 'photo' : 'status',
+    text,
+  }
+  if (media) networkConfig.media = media
+
+  const body = {
+    bulk: {
+      state: 'scheduled',
+      posts: [
+        {
+          networks: { linkedin: networkConfig },
+          accounts: [{ id: accountId }],
+          share_last: true, // add to end of queue
+        },
+      ],
+    },
+  }
+
+  const response = await fetch(`${PUBLER_API_URL}/posts/schedule`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  const responseText = await response.text()
+  if (!response.ok) {
+    throw new Error(`Publer schedule error (${response.status}): ${responseText}`)
+  }
+  let result: any
+  try {
+    result = JSON.parse(responseText)
+  } catch {
+    throw new Error(`Invalid JSON from Publer schedule: ${responseText}`)
+  }
+
+  const jobId = result.data?.job_id || result.job_id
+  if (!jobId) {
+    throw new Error(result.error || result.errors?.join(', ') || 'Failed to schedule LinkedIn post')
+  }
+
+  const jobResult = await pollJobStatus(jobId, 15)
+
+  // Surface failures/errors from the job payload as a readable message.
+  if (jobResult?.payload?.failures) {
+    const failedAccounts = Object.values(jobResult.payload.failures).flat() as any[]
+    if (failedAccounts.length > 0) {
+      const msg = failedAccounts.map((f: any) => `${f.provider || 'linkedin'}: ${f.message}`).join('; ')
+      throw new Error(`LinkedIn scheduling failed: ${msg}`)
+    }
+  }
+  if (jobResult?.payload?.error || jobResult?.error) {
+    throw new Error(jobResult.payload?.error || jobResult.error || 'LinkedIn scheduling failed')
+  }
+
+  const postIds = extractPublerPostIds(jobResult)
+  return { jobId, postIds }
+}
+
+/**
+ * Get the state of a Publer post (MICM-12 AK5). Returns a lowercase state string
+ * ('scheduled' | 'published' | 'draft' | 'failed' | 'deleted' | 'unknown').
+ * NOTE: the exact Publer endpoint/field shape is assumed per the Publer API
+ * (GET /posts/:id → { state | status }); adjust if the reference project differs.
+ */
+export async function getPublerPostState(postId: string): Promise<string> {
+  const headers = getPubHeaders()
+  const response = await fetch(`${PUBLER_API_URL}/posts/${postId}`, { headers })
+  if (response.status === 404) return 'deleted'
+  if (!response.ok) {
+    throw new Error(`Failed to read Publer post ${postId} (${response.status})`)
+  }
+  const data = await response.json().catch(() => ({}))
+  const post = data?.data || data
+  return String(post?.state || post?.status || 'unknown').toLowerCase()
+}
+
+/**
+ * Delete a Publer post (MICM-12 AK5, replace-while-queued).
+ * Treats 404 as already gone. NOTE: endpoint assumed per Publer API (DELETE /posts/:id).
+ */
+export async function deletePublerPost(postId: string): Promise<void> {
+  const headers = getPubHeaders()
+  const response = await fetch(`${PUBLER_API_URL}/posts/${postId}`, { method: 'DELETE', headers })
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Failed to delete Publer post ${postId} (${response.status})`)
+  }
+}
+
+/** Publer states that mean "already delivered" → re-publishing is blocked. */
+export function isPublishedState(state: string): boolean {
+  return ['published', 'posted', 'completed', 'complete'].includes(state)
+}
+
+/** Publer states that mean "still in the queue" → re-publishing replaces it. */
+export function isQueuedState(state: string): boolean {
+  return ['scheduled', 'queued', 'pending', 'draft', 'processing'].includes(state)
 }
 
 /**
