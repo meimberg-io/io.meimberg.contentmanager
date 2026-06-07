@@ -10,7 +10,6 @@ import { toast } from "@/hooks/use-toast";
 interface BlogLinkedinSectionProps {
   blogUuid: string;
   blogSlug: string;
-  blogContentType: "blog" | "article";
   blogTitle: string;
 }
 
@@ -20,17 +19,11 @@ interface BlogLinkedinSectionProps {
  * a new one. Attached posts are edited inline via the SAME LinkedinEditor used on
  * /linkedin/[id] — no second edit implementation.
  */
-export function BlogLinkedinSection({ blogUuid, blogSlug, blogContentType, blogTitle }: BlogLinkedinSectionProps) {
+export function BlogLinkedinSection({ blogUuid, blogSlug, blogTitle }: BlogLinkedinSectionProps) {
   const [posts, setPosts] = useState<LinkedinPost[]>([]);
+  const [parent, setParent] = useState<BlogParentInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-
-  const parent: BlogParentInfo = {
-    uuid: blogUuid,
-    slug: blogSlug,
-    contentType: blogContentType,
-    title: blogTitle,
-  };
 
   const load = useCallback(async () => {
     if (!blogUuid) return;
@@ -40,6 +33,7 @@ export function BlogLinkedinSection({ blogUuid, blogSlug, blogContentType, blogT
       if (!response.ok) throw new Error(`Failed to fetch (${response.status})`);
       const data = await response.json();
       setPosts(data.posts || []);
+      setParent(data.parent || null);
     } catch (error: any) {
       toast({ title: "Failed to load attached LinkedIn posts", description: error.message, variant: "destructive" });
     } finally {

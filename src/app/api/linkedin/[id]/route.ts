@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-guard'
 import { getLinkedinPostById, resolveBlogStoryByUuid } from '@/lib/storyblok-management'
+import { buildBlogLinkPreview, type BlogLinkPreview } from '@/lib/linkedin-link'
 
 /**
  * GET /api/linkedin/[id]
@@ -25,17 +26,12 @@ export async function GET(
       return NextResponse.json({ error: 'LinkedIn post not found' }, { status: 404 })
     }
 
-    let parent: { uuid: string; slug: string; contentType: 'blog' | 'article'; title: string } | null = null
+    let parent: BlogLinkPreview | null = null
     const blogUuid = story.content?.cm_blog_ref
     if (blogUuid) {
       const blog = await resolveBlogStoryByUuid(blogUuid)
       if (blog) {
-        parent = {
-          uuid: blogUuid,
-          slug: blog.slug || '',
-          contentType: blog.content?.component === 'article' ? 'article' : 'blog',
-          title: blog.content?.pagetitle || blog.name || blog.slug || '',
-        }
+        parent = buildBlogLinkPreview(blogUuid, blog)
       }
     }
 

@@ -993,7 +993,6 @@ export default function PostDetailPage() {
         <BlogLinkedinSection
           blogUuid={post.id}
           blogSlug={post.slug}
-          blogContentType={storyKind.contentType}
           blogTitle={form.pagetitle || post.pagetitle || post.slug}
         />
 

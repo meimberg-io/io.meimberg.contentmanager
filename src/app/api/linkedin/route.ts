@@ -9,20 +9,14 @@ import {
 } from '@/lib/storyblok-management'
 import { fetchLinkedinPosts, fetchLinkedinPostsByBlogUuid } from '@/lib/storyblok'
 import { transformStoryblokLinkedin } from '@/lib/transform-storyblok'
+import { buildBlogLinkPreview, type BlogLinkPreview } from '@/lib/linkedin-link'
 import type { LinkedinPost } from '@/types'
-
-/** Parent blog info for the LinkedIn list parent-marker (links to the blog detail). */
-interface BlogParentInfo {
-  uuid: string
-  slug: string
-  contentType: 'blog' | 'article'
-  title: string
-}
 
 /**
  * GET /api/linkedin
- * - `?blogUuid=<uuid>` → LinkedIn posts attached to that blog (MICM-8 AK6a).
- * - otherwise → full LinkedIn list + a `parents` map (blog UUID → blog slug/title)
+ * - `?blogUuid=<uuid>` → LinkedIn posts attached to that blog (MICM-8 AK6a),
+ *   plus the resolved `parent` blog link preview (MICM-11).
+ * - otherwise → full LinkedIn list + a `parents` map (blog UUID → blog link preview)
  *   so the list can render parent markers linking to the blog detail (MICM-10 AK2).
  * Protected: Requires authentication.
  */
@@ -40,27 +34,24 @@ export async function GET(request: Request) {
     if (blogUuid) {
       const stories = await fetchLinkedinPostsByBlogUuid(blogUuid)
       const posts: LinkedinPost[] = stories.map(transformStoryblokLinkedin)
-      return NextResponse.json({ posts, total: posts.length })
+      const blog = await resolveBlogStoryByUuid(blogUuid)
+      const parent: BlogLinkPreview | null = blog ? buildBlogLinkPreview(blogUuid, blog) : null
+      return NextResponse.json({ posts, total: posts.length, parent })
     }
 
     const { stories } = await fetchLinkedinPosts()
     const posts: LinkedinPost[] = stories.map(transformStoryblokLinkedin)
 
-    // Resolve unique parent blog UUIDs → slug/contentType/title for parent markers.
+    // Resolve unique parent blog UUIDs → link preview for parent markers.
     const uniqueParentUuids = [
       ...new Set(posts.map((p) => p.blogParentUuid).filter((u): u is string => !!u)),
     ]
-    const parents: Record<string, BlogParentInfo> = {}
+    const parents: Record<string, BlogLinkPreview> = {}
     await Promise.all(
       uniqueParentUuids.map(async (uuid) => {
         const blog = await resolveBlogStoryByUuid(uuid)
         if (blog) {
-          parents[uuid] = {
-            uuid,
-            slug: blog.slug || '',
-            contentType: blog.content?.component === 'article' ? 'article' : 'blog',
-            title: blog.content?.pagetitle || blog.name || blog.slug || '',
-          }
+          parents[uuid] = buildBlogLinkPreview(uuid, blog)
         }
       })
     )

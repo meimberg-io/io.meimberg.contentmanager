@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { LinkedinPost } from "@/types";
+import type { BlogLinkPreview } from "@/lib/linkedin-link";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -34,16 +35,16 @@ import {
   Link2,
   ChevronDown,
   ChevronRight,
+  ImageIcon,
+  Upload,
+  X,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-export interface BlogParentInfo {
-  uuid: string;
-  slug: string;
-  contentType: "blog" | "article";
-  title: string;
-}
+/** Parent blog link preview (resolved server-side, MICM-11). */
+export type BlogParentInfo = BlogLinkPreview;
 
 interface LinkedinEditorProps {
   post: LinkedinPost;
@@ -67,14 +68,20 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
   const isAttached = !!post.blogParentUuid;
   const [text, setText] = useState(post.linkedinText || "");
   const [sourceSummarized, setSourceSummarized] = useState(post.sourceSummarized || "");
+  const [imageUrl, setImageUrl] = useState<string | undefined>(post.linkedinImage);
+  const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [showSource, setShowSource] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hasSource = !!post.sourceRaw || !!sourceSummarized;
-  const dirty = text !== (post.linkedinText || "") || sourceSummarized !== (post.sourceSummarized || "");
+  const dirty =
+    text !== (post.linkedinText || "") ||
+    sourceSummarized !== (post.sourceSummarized || "") ||
+    imageUrl !== post.linkedinImage;
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -112,6 +119,23 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
     }
   };
 
+  const handleUploadImage = async (file: File) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/posts/upload", { method: "POST", body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Upload failed");
+      setImageUrl(data.publicUrl || data.filename);
+      toast({ title: "Image uploaded", description: "Save to attach it to the post." });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -121,7 +145,13 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
         body: JSON.stringify({
           id: post.storyblokId,
           linkedin_text: text,
-          ...(!isAttached ? { cm_source_summarized: sourceSummarized } : {}),
+          ...(!isAttached
+            ? {
+                cm_source_summarized: sourceSummarized,
+                // Standalone image: send asset object, or "" to clear.
+                linkedin_image: imageUrl ? { filename: imageUrl, fieldtype: "asset" } : "",
+              }
+            : {}),
         }),
       });
       if (!response.ok) {
@@ -212,6 +242,94 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
           <Badge variant="outline" className="text-[10px]">Attached</Badge>
         )}
       </div>
+
+      {/* Attached: blog link preview card (OG-style). LinkedIn unfurls this card
+          from the blog URL appended at publish time (MICM-12) — no own image. */}
+      {isAttached && parent && (
+        <div className="rounded-lg border border-border/60 overflow-hidden bg-secondary/20">
+          {!parent.published ? (
+            <div className="flex items-start gap-2 p-3 text-sm text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">Blog not published yet</p>
+                <p className="text-xs text-muted-foreground">
+                  Link &amp; preview will be available once the blog post is published. The link is appended automatically when you publish to LinkedIn.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <a href={parent.url} target="_blank" rel="noopener noreferrer" className="block hover:bg-secondary/40 transition-colors">
+              {parent.imageUrl && (
+                <div className="relative w-full bg-muted" style={{ aspectRatio: "1200/630" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={parent.imageUrl} alt={parent.title} className="absolute inset-0 h-full w-full object-cover" />
+                </div>
+              )}
+              <div className="p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
+                  {parent.url.replace(/^https?:\/\//, "")}
+                </p>
+                <p className="text-sm font-medium line-clamp-2">{parent.title}</p>
+              </div>
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Standalone: own image (linkedin_image). No link/card for standalone. */}
+      {!isAttached && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Image (optional)</Label>
+            {imageUrl && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-red-500"
+                onClick={() => setImageUrl(undefined)}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Remove
+              </Button>
+            )}
+          </div>
+          {imageUrl ? (
+            <div className="relative w-full overflow-hidden rounded-lg border border-border/50" style={{ aspectRatio: "1200/630" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imageUrl} alt="LinkedIn image" className="absolute inset-0 h-full w-full object-cover" />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-full rounded-lg border border-dashed border-border/60 bg-secondary/10 p-6 text-center text-sm text-muted-foreground hover:border-primary/40 cursor-pointer transition-colors"
+            >
+              {uploading ? (
+                <Loader2 className="h-6 w-6 mx-auto animate-spin opacity-50" />
+              ) : (
+                <>
+                  <ImageIcon className="h-6 w-6 mx-auto mb-2 opacity-40" />
+                  <span className="inline-flex items-center gap-1">
+                    <Upload className="h-3.5 w-3.5" /> Upload an image
+                  </span>
+                </>
+              )}
+            </button>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUploadImage(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
+      )}
 
       {/* Standalone: editable source so generation has material */}
       {!isAttached && (
