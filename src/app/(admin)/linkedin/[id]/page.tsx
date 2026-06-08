@@ -8,6 +8,7 @@ import { LinkedinEditor, type BlogParentInfo } from "@/components/linkedin/Linke
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export default function LinkedinDetailPage() {
   const router = useRouter();
@@ -67,7 +68,7 @@ export default function LinkedinDetailPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className={cn("space-y-6", post.blogParentUuid ? "max-w-3xl" : "max-w-6xl")}>
       <div className="flex items-center gap-4 animate-fade-in">
         <Button variant="ghost" size="icon" className="shrink-0" onClick={() => router.push("/linkedin")}>
           <ArrowLeft className="h-5 w-5" />
