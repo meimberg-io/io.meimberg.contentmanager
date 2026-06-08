@@ -717,29 +717,46 @@ export async function createLinkedinPost(
   }
   content.linkedin_image = ensureAssetField(content.linkedin_image)
 
-  const response = await managementFetch(
-    `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories`,
-    {
-      method: 'POST',
-      headers: { 'Authorization': MANAGEMENT_TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        story: {
-          name,
-          slug: generateSlug(name),
-          content,
-          parent_id: parentId,
-        },
-        // No publish: 1 — draft only
-      }),
-    }
-  )
+  // The name is often non-unique (e.g. "LinkedIn: <blog title>" for every post
+  // attached to the same blog), so the deterministic slug collides on the 2nd+
+  // create. Retry with an incrementing suffix instead of dead-ending on
+  // Storyblok's "Slug ... already taken" error.
+  const baseSlug = generateSlug(name)
+  const MAX_SLUG_ATTEMPTS = 20
+  let lastError: unknown = null
+  for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt++) {
+    const slug = attempt === 1 ? baseSlug : clampSlugForStoryblok(`${baseSlug}-${attempt}`)
+    const response = await managementFetch(
+      `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': MANAGEMENT_TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          story: { name, slug, content, parent_id: parentId },
+          // No publish: 1 — draft only
+        }),
+      }
+    )
 
-  if (!response.ok) {
+    if (response.ok) {
+      return await response.json()
+    }
+
     const error = await response.json().catch(() => ({}))
-    throw new Error(`Failed to create LinkedIn post: ${JSON.stringify(error)}`)
+    lastError = error
+    if (!isSlugTakenError(error)) {
+      throw new Error(`Failed to create LinkedIn post: ${JSON.stringify(error)}`)
+    }
+    // Slug collision → try the next suffix.
   }
 
-  return await response.json()
+  throw new Error(`Failed to create LinkedIn post: ${JSON.stringify(lastError)}`)
+}
+
+/** True if a Storyblok create error is the "Slug ... already taken" validation. */
+function isSlugTakenError(error: unknown): boolean {
+  const slugErrors = (error as { slug?: unknown })?.slug
+  return Array.isArray(slugErrors) && slugErrors.some((m) => /already taken/i.test(String(m)))
 }
 
 /**
