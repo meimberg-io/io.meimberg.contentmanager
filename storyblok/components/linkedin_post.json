@@ -70,6 +70,18 @@
       "type": "text",
       "pos": 10,
       "display_name": "Publer post IDs (comma-separated)"
+    },
+    "cm_tags": {
+      "type": "text",
+      "pos": 11,
+      "display_name": "Tags (comma-separated)",
+      "description": "Content-Manager categorization tags. Comma-separated; internal organization only, not rendered in the post text."
+    },
+    "cm_image_prompt": {
+      "type": "textarea",
+      "pos": 12,
+      "display_name": "Image prompt (DALL-E)",
+      "description": "Standalone posts only: prompt used to generate the LinkedIn image via DALL-E."
     }
   }
 }

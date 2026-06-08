@@ -24,6 +24,7 @@ export interface Article {
     | Grouping
     | Hyperlink
     | Icon
+    | LinkedinPost
     | Linklist
     | LuxariseManagerConfig
     | LuxarisePicture
@@ -44,7 +45,6 @@ export interface Article {
     | Tool
     | Video
     | Youtube
-    | LinkedinPost
   )[];
   component: "article";
   _uid: string;
@@ -86,6 +86,7 @@ export interface Blog {
     | Grouping
     | Hyperlink
     | Icon
+    | LinkedinPost
     | Linklist
     | LuxariseManagerConfig
     | LuxarisePicture
@@ -106,7 +107,6 @@ export interface Blog {
     | Tool
     | Video
     | Youtube
-    | LinkedinPost
   )[];
   cm_content_complete?: boolean;
   cm_content_confirmed_at?: string;
@@ -172,6 +172,7 @@ export interface Grid2Column {
     | Grouping
     | Hyperlink
     | Icon
+    | LinkedinPost
     | Linklist
     | LuxariseManagerConfig
     | LuxarisePicture
@@ -192,7 +193,6 @@ export interface Grid2Column {
     | Tool
     | Video
     | Youtube
-    | LinkedinPost
   )[];
   col2?: (
     | Article
@@ -206,6 +206,7 @@ export interface Grid2Column {
     | Grouping
     | Hyperlink
     | Icon
+    | LinkedinPost
     | Linklist
     | LuxariseManagerConfig
     | LuxarisePicture
@@ -226,7 +227,6 @@ export interface Grid2Column {
     | Tool
     | Video
     | Youtube
-    | LinkedinPost
   )[];
   component: "grid_2column";
   _uid: string;
@@ -247,6 +247,7 @@ export interface Grouping {
     | Grouping
     | Hyperlink
     | Icon
+    | LinkedinPost
     | Linklist
     | LuxariseManagerConfig
     | LuxarisePicture
@@ -267,7 +268,6 @@ export interface Grouping {
     | Tool
     | Video
     | Youtube
-    | LinkedinPost
   )[];
   component: "grouping";
   _uid: string;
@@ -285,6 +285,25 @@ export interface Hyperlink {
 export interface Icon {
   svg?: string;
   component: "icon";
+  _uid: string;
+  [k: string]: unknown;
+}
+
+export interface LinkedinPost {
+  linkedin_text?: string;
+  linkedin_image?: StoryblokAsset;
+  cm_blog_ref?: string;
+  cm_source_raw?: string;
+  cm_source_summarized?: string;
+  cm_ai_hint?: string;
+  cm_origin?: "" | "import" | "create";
+  cm_content_complete?: boolean;
+  cm_content_confirmed_at?: string;
+  cm_publer_published_at?: string;
+  cm_publer_post_ids?: string;
+  cm_tags?: string;
+  cm_image_prompt?: string;
+  component: "linkedin_post";
   _uid: string;
   [k: string]: unknown;
 }
@@ -387,6 +406,7 @@ export interface Page {
     | Grouping
     | Hyperlink
     | Icon
+    | LinkedinPost
     | Linklist
     | LuxariseManagerConfig
     | LuxarisePicture
@@ -407,7 +427,6 @@ export interface Page {
     | Tool
     | Video
     | Youtube
-    | LinkedinPost
   )[];
   hidepagetitle?: boolean;
   component: "page";
@@ -490,6 +509,7 @@ export interface Stuff {
     | Grouping
     | Hyperlink
     | Icon
+    | LinkedinPost
     | Linklist
     | LuxariseManagerConfig
     | LuxarisePicture
@@ -510,7 +530,6 @@ export interface Stuff {
     | Tool
     | Video
     | Youtube
-    | LinkedinPost
   )[];
   Teaser?: unknown;
   teasertitle?: string;
@@ -554,23 +573,6 @@ export interface Youtube {
   [k: string]: unknown;
 }
 
-export interface LinkedinPost {
-  linkedin_text?: string;
-  linkedin_image?: StoryblokAsset;
-  cm_blog_ref?: string;
-  cm_source_raw?: string;
-  cm_source_summarized?: string;
-  cm_ai_hint?: string;
-  cm_origin?: "" | "import" | "create";
-  cm_content_complete?: boolean;
-  cm_content_confirmed_at?: string;
-  cm_publer_published_at?: string;
-  cm_publer_post_ids?: string;
-  component: "linkedin_post";
-  _uid: string;
-  [k: string]: unknown;
-}
-
 export type ContentType =
   | Article
   | Blog
@@ -578,11 +580,11 @@ export type ContentType =
   | Grid2column
   | Grouping
   | Icon
+  | LinkedinPost
   | Linklist
   | LuxariseManagerConfig
   | LuxarisePicture
   | News
   | Page
   | Sociallink
-  | Stuff
-  | LinkedinPost;
+  | Stuff;
