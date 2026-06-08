@@ -11,6 +11,8 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
+  FileText,
+  Linkedin,
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -27,9 +29,12 @@ interface EmailItem {
   preview: string;
 }
 
+type ImportTarget = "blog" | "linkedin";
+
 interface ImportResult {
   emailId: string;
   success: boolean;
+  target: ImportTarget;
   postId?: string;
   slug?: string;
   error?: string;
@@ -38,18 +43,19 @@ interface ImportResult {
 export default function ImportPage() {
   const [emails, setEmails] = useState<EmailItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [targets, setTargets] = useState<Record<string, ImportTarget>>({});
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<ImportResult[]>([]);
   const [hasChecked, setHasChecked] = useState(false);
-  const [showPostsLink, setShowPostsLink] = useState(false);
 
   const checkInbox = async () => {
     setLoading(true);
     setError(null);
     setResults([]);
     setSelectedIds(new Set());
+    setTargets({});
 
     try {
       const response = await fetch('/api/import/emails');
@@ -78,6 +84,12 @@ export default function ImportPage() {
     setSelectedIds(newSelected);
   };
 
+  const targetOf = (id: string): ImportTarget => targets[id] ?? "blog";
+
+  const setTarget = (id: string, target: ImportTarget) => {
+    setTargets((prev) => ({ ...prev, [id]: target }));
+  };
+
   const selectAll = () => {
     if (selectedIds.size === emails.length) {
       setSelectedIds(new Set());
@@ -93,10 +105,14 @@ export default function ImportPage() {
     setResults([]);
 
     try {
+      const selected = Array.from(selectedIds);
+      const targetMap: Record<string, ImportTarget> = {};
+      for (const id of selected) targetMap[id] = targetOf(id);
+
       const response = await fetch('/api/import/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emailIds: Array.from(selectedIds) }),
+        body: JSON.stringify({ emailIds: selected, targets: targetMap }),
       });
 
       const data = await response.json();
@@ -118,13 +134,12 @@ export default function ImportPage() {
       setSelectedIds(new Set());
 
       const successCount = (data.results || []).filter((r: ImportResult) => r.success).length;
-      
+
       if (successCount > 0) {
         toast({
           title: "Import successful",
           description: `${successCount} post(s) imported. Open them to generate content with AI.`,
         });
-        setShowPostsLink(true);
       }
     } catch (err: any) {
       setError(err.message);
@@ -139,7 +154,7 @@ export default function ImportPage() {
       <div className="animate-fade-in">
         <h1 className="font-display text-3xl font-bold tracking-tight">Import from Inbox</h1>
         <p className="text-muted-foreground mt-1">
-          Check the blog inbox for new Plaud transcriptions and import them as blog posts.
+          Check the inbox for new Plaud transcriptions and import each as a blog post or a standalone LinkedIn post.
         </p>
       </div>
 
@@ -198,7 +213,7 @@ export default function ImportPage() {
               )}
               <span className="text-sm">
                 {result.success
-                  ? `Imported successfully${result.slug ? ` → ${result.slug}` : ''}`
+                  ? `Imported as ${result.target === 'linkedin' ? 'LinkedIn post' : 'blog'}${result.slug ? ` → ${result.slug}` : ''}`
                   : `Failed: ${result.error}`}
               </span>
             </div>
@@ -206,18 +221,28 @@ export default function ImportPage() {
         </div>
       )}
 
-      {/* Link to posts list after import */}
-      {showPostsLink && (
+      {/* Links to the created entities after import (per target type) */}
+      {results.some((r) => r.success) && (
         <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
           <CheckCircle className="h-5 w-5 text-primary shrink-0" />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="text-sm">Import complete.</span>
-            <Link
-              href="/posts?content=ry&published=r"
-              className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
-            >
-              View imported posts (draft & incomplete)
-            </Link>
+            {results.some((r) => r.success && r.target === 'blog') && (
+              <Link
+                href="/posts?content=ry&published=r"
+                className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+              >
+                View imported posts (draft & incomplete)
+              </Link>
+            )}
+            {results.some((r) => r.success && r.target === 'linkedin') && (
+              <Link
+                href="/linkedin"
+                className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+              >
+                View imported LinkedIn posts
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -306,6 +331,39 @@ export default function ImportPage() {
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/* Target type — independent of the selection checkbox */}
+                <div
+                  className="flex shrink-0 overflow-hidden rounded-md border border-border/50"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setTarget(email.id, "blog")}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium cursor-pointer transition-colors",
+                      targetOf(email.id) === "blog"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Blog
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTarget(email.id, "linkedin")}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium cursor-pointer transition-colors",
+                      targetOf(email.id) === "linkedin"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    <Linkedin className="h-3.5 w-3.5" />
+                    LinkedIn
+                  </button>
                 </div>
               </div>
             ))}

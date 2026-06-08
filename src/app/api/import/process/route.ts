@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-guard'
 import { fetchEmailWithAttachments, deleteEmail } from '@/lib/mail-inbox'
-import { createPost } from '@/lib/storyblok-management'
+import { createPost, createLinkedinPost } from '@/lib/storyblok-management'
+
+type ImportTarget = 'blog' | 'linkedin'
 
 /**
  * POST /api/import/process
- * Import selected email(s) as blog posts
- * Body: { emailIds: string[] }
+ * Import selected email(s) as blog posts or standalone LinkedIn posts.
+ * Body: { emailIds: string[], targets?: Record<emailId, 'blog' | 'linkedin'> }
+ * A missing target defaults to 'blog' (backward compatible).
  */
 export async function POST(request: Request) {
   try {
@@ -18,6 +21,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const emailIds: string[] = body.emailIds || body.uids // support both for compat
+    const targets: Record<string, ImportTarget> = body.targets || {}
 
     if (!Array.isArray(emailIds) || emailIds.length === 0) {
       return NextResponse.json({ error: 'No email IDs provided' }, { status: 400 })
@@ -26,12 +30,14 @@ export async function POST(request: Request) {
     const results: Array<{
       emailId: string
       success: boolean
+      target: ImportTarget
       postId?: string
       slug?: string
       error?: string
     }> = []
 
     for (const emailId of emailIds) {
+      const target: ImportTarget = targets[String(emailId)] === 'linkedin' ? 'linkedin' : 'blog'
       try {
         // Fetch email with attachments
         const email = await fetchEmailWithAttachments(String(emailId))
@@ -58,21 +64,34 @@ export async function POST(request: Request) {
           sourceSummarized = email.body
         }
 
-        // Create blog post in Storyblok
-        const postName = email.subject || `Blog Post ${new Date().toISOString().split('T')[0]}`
-        
-        const result = await createPost({
-          name: postName,
-          pagetitle: '',
-          pageintro: '',
-          date: email.date.split('T')[0], // Just the date part
-          abstract: '',
-          teasertitle: '',
-          readmoretext: '',
-          cm_source_raw: sourceRaw,
-          cm_source_summarized: sourceSummarized,
-          cm_origin: 'import',
-        })
+        // Create the target story in Storyblok. Source extraction above is
+        // identical for both targets; only the entity created differs.
+        const today = new Date().toISOString().split('T')[0]
+        let result: any
+        if (target === 'linkedin') {
+          // Standalone LinkedIn post (no blogParentUuid). Text stays empty —
+          // it's generated later in the LinkedIn editor from the source material.
+          result = await createLinkedinPost({
+            name: email.subject || `LinkedIn-Post ${today}`,
+            linkedin_text: '',
+            cm_source_raw: sourceRaw,
+            cm_source_summarized: sourceSummarized,
+            cm_origin: 'import',
+          })
+        } else {
+          result = await createPost({
+            name: email.subject || `Blog Post ${today}`,
+            pagetitle: '',
+            pageintro: '',
+            date: email.date.split('T')[0], // Just the date part
+            abstract: '',
+            teasertitle: '',
+            readmoretext: '',
+            cm_source_raw: sourceRaw,
+            cm_source_summarized: sourceSummarized,
+            cm_origin: 'import',
+          })
+        }
 
         // Delete email from inbox after successful import
         await deleteEmail(String(emailId))
@@ -83,6 +102,7 @@ export async function POST(request: Request) {
         results.push({
           emailId: String(emailId),
           success: true,
+          target,
           postId: result.story?.uuid,
           slug: result.story?.slug,
         })
@@ -91,6 +111,7 @@ export async function POST(request: Request) {
         results.push({
           emailId: String(emailId),
           success: false,
+          target,
           error: error.message,
         })
       }
