@@ -167,7 +167,10 @@ export async function fetchLinkedinPostsByBlogUuid(blogUuid: string) {
     starts_with: 'linkedin/',
     filter_query: {
       component: { in: 'linkedin_post' },
-      cm_blog_ref: { is: blogUuid },
+      // `is` is Storyblok's empty/null/boolean operator — with a string value it is
+      // silently ignored and the field is NOT filtered (every blog would then see
+      // ALL LinkedIn posts). String equality requires `in`.
+      cm_blog_ref: { in: blogUuid },
     },
     per_page: 100,
   } as ISbStoriesParams, cacheOpt)
