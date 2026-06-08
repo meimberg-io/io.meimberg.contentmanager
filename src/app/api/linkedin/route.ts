@@ -125,6 +125,8 @@ export async function PATCH(request: Request) {
       'cm_source_raw',
       'cm_source_summarized',
       'cm_ai_hint',
+      'cm_image_prompt',
+      'cm_tags',
       'cm_origin',
       'cm_content_complete',
       'cm_content_confirmed_at',

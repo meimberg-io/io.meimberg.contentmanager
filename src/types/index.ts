@@ -76,6 +76,8 @@ export interface LinkedinPost {
   sourceRaw?: string;
   sourceSummarized?: string;
   aiHint?: string;
+  imagePrompt?: string;    // DALL-E prompt (standalone posts)
+  tags?: string[];         // Categorization tags (Content-Manager-internal)
   // Origin: how the post was created
   origin?: 'import' | 'create';
   // Parent reference — empty/undefined = standalone, set = attached to a blog

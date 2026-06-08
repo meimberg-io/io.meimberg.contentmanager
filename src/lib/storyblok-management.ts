@@ -644,6 +644,10 @@ export interface LinkedinPostData {
   cm_source_raw?: string
   cm_source_summarized?: string
   cm_ai_hint?: string
+  /** DALL-E image prompt (standalone posts). */
+  cm_image_prompt?: string
+  /** Comma-separated categorization tags (Content-Manager-internal). */
+  cm_tags?: string
   cm_origin?: 'import' | 'create'
   cm_content_complete?: boolean
   cm_content_confirmed_at?: string

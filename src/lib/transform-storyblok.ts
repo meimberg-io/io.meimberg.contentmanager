@@ -89,6 +89,10 @@ export function transformStoryblokLinkedin(story: any): LinkedinPost {
     sourceRaw: content.cm_source_raw || undefined,
     sourceSummarized: content.cm_source_summarized || undefined,
     aiHint: content.cm_ai_hint || undefined,
+    imagePrompt: content.cm_image_prompt || undefined,
+    tags: content.cm_tags
+      ? content.cm_tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+      : undefined,
     origin: content.cm_origin === 'import' || content.cm_origin === 'create' ? content.cm_origin : undefined,
     blogParentUuid,
     status: {
