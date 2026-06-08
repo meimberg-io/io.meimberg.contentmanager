@@ -68,6 +68,7 @@ interface LinkedinEditorProps {
 export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = false }: LinkedinEditorProps) {
   const isAttached = !!post.blogParentUuid;
   const [text, setText] = useState(post.linkedinText || "");
+  const [sourceRaw, setSourceRaw] = useState(post.sourceRaw || "");
   const [sourceSummarized, setSourceSummarized] = useState(post.sourceSummarized || "");
   const [imageUrl, setImageUrl] = useState<string | undefined>(post.linkedinImage);
   const [uploading, setUploading] = useState(false);
@@ -77,12 +78,13 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
-  const [showSource, setShowSource] = useState(false);
+  const [showSource, setShowSource] = useState(!!post.sourceRaw || !!post.sourceSummarized);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const hasSource = !!post.sourceRaw || !!sourceSummarized;
+  const hasSource = !!sourceRaw || !!sourceSummarized;
   const dirty =
     text !== (post.linkedinText || "") ||
+    sourceRaw !== (post.sourceRaw || "") ||
     sourceSummarized !== (post.sourceSummarized || "") ||
     imageUrl !== post.linkedinImage;
 
@@ -103,11 +105,18 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
     try {
       // For standalone posts, persist the (possibly edited) source first so it
       // is not lost and the generation uses the current material.
-      if (!isAttached && sourceSummarized && sourceSummarized !== (post.sourceSummarized || "")) {
+      if (
+        !isAttached &&
+        (sourceRaw !== (post.sourceRaw || "") || sourceSummarized !== (post.sourceSummarized || ""))
+      ) {
         await fetch("/api/linkedin", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: post.storyblokId, cm_source_summarized: sourceSummarized }),
+          body: JSON.stringify({
+            id: post.storyblokId,
+            cm_source_raw: sourceRaw,
+            cm_source_summarized: sourceSummarized,
+          }),
         });
       }
 
@@ -117,7 +126,7 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
         body: JSON.stringify({
           storyId: post.storyblokId,
           type: "linkedin",
-          sourceRaw: post.sourceRaw,
+          sourceRaw: sourceRaw || post.sourceRaw,
           sourceSummarized: sourceSummarized || post.sourceSummarized,
         }),
       });
@@ -162,6 +171,7 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
           linkedin_text: text,
           ...(!isAttached
             ? {
+                cm_source_raw: sourceRaw,
                 cm_source_summarized: sourceSummarized,
                 // Standalone image: send asset object, or "" to clear.
                 linkedin_image: imageUrl ? { filename: imageUrl, fieldtype: "asset" } : "",
@@ -377,20 +387,34 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
         </div>
       )}
 
-      {/* Standalone: editable source so generation has material */}
+      {/* Standalone: editable source so generation has material. Both fields are
+          shown and editable (mirrors the blog detail's Summary + Raw); generation
+          prefers the summary and falls back to the raw transcription. */}
       {!isAttached && (
         <Collapsible open={showSource} onOpenChange={setShowSource}>
           <CollapsibleTrigger className="flex items-center gap-1 text-left text-xs text-muted-foreground hover:text-foreground">
             {showSource ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             Source material (for generation)
           </CollapsibleTrigger>
-          <CollapsibleContent>
-            <Textarea
-              value={sourceSummarized}
-              onChange={(e) => setSourceSummarized(e.target.value)}
-              placeholder="Paste source material here to generate a LinkedIn post from it..."
-              className="mt-2 min-h-[100px] bg-secondary/40 text-xs"
-            />
+          <CollapsibleContent className="mt-2 space-y-2">
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Summary</Label>
+              <Textarea
+                value={sourceSummarized}
+                onChange={(e) => setSourceSummarized(e.target.value)}
+                placeholder="Summarized source material — the preferred input for generation…"
+                className="min-h-[100px] bg-secondary/40 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Raw transcription</Label>
+              <Textarea
+                value={sourceRaw}
+                onChange={(e) => setSourceRaw(e.target.value)}
+                placeholder="Raw transcription — used when no summary is present…"
+                className="min-h-[100px] bg-secondary/40 text-xs"
+              />
+            </div>
           </CollapsibleContent>
         </Collapsible>
       )}
