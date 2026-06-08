@@ -709,10 +709,16 @@ export async function createLinkedinPost(
     }
   }
 
+  // Drop undefined keys: callers pass `cm_source_*: undefined` for attached
+  // posts (no client-supplied source), and a spread of those would clobber the
+  // mirrored blog source with undefined. Only real values may override the mirror.
+  const definedContentFields = Object.fromEntries(
+    Object.entries(contentFields).filter(([, v]) => v !== undefined)
+  )
   const content: Record<string, any> = {
     component: 'linkedin_post',
     ...mirroredSource,
-    ...contentFields,
+    ...definedContentFields,
     ...(blogParentUuid ? { cm_blog_ref: blogParentUuid } : {}),
   }
   content.linkedin_image = ensureAssetField(content.linkedin_image)
