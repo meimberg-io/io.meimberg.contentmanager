@@ -8,6 +8,7 @@ import {
   generateReadMoreText,
   generateBody,
   generateLinkedinText,
+  generateTags,
   optimizeText,
 } from '@/lib/openai'
 import { updatePost, updateLinkedinPost } from '@/lib/storyblok-management'
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       contentType: requestContentType,
       blogBodyVariant: requestBlogBodyVariant,
     } = body
-    // type: 'pagetitle' | 'abstract' | 'pageintro' | 'teasertitle' | 'readmoretext' | 'body' | 'optimize'
+    // type: 'pagetitle' | 'abstract' | 'pageintro' | 'teasertitle' | 'readmoretext' | 'body' | 'linkedin' | 'tags' | 'optimize'
 
     // Get settings (model + prompts)
     const settings = await getSettings()
@@ -138,6 +139,17 @@ export async function POST(request: Request) {
         if (storyId) {
           await updateLinkedinPost(storyId, { linkedin_text: result.linkedin })
         }
+        break
+
+      case 'tags':
+        if (!sourceRaw && !sourceSummarized) {
+          return NextResponse.json({
+            error: 'Source material is required for tag generation'
+          }, { status: 400 })
+        }
+        genOptions.prompt = storedPrompts.tags || DEFAULT_PROMPTS.tags
+        // Returned to the client for editing; not auto-persisted (unlike linkedin_text).
+        result.tags = await generateTags(genOptions)
         break
 
       case 'optimize':

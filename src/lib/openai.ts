@@ -411,6 +411,28 @@ export async function generateLinkedinText(options: BlogGenerationOptions): Prom
 }
 
 /**
+ * Generate categorization tags from source material (Content-Manager-internal).
+ * Returns a deduped, trimmed list of short tags. The model is asked for a
+ * comma-separated line; we parse defensively (commas or newlines).
+ */
+export async function generateTags(options: BlogGenerationOptions): Promise<string[]> {
+  const prompt = options.prompt || DEFAULT_PROMPTS.tags
+  const fullPrompt = buildFullPrompt(options.sourceRaw, options.sourceSummarized, prompt, options.hint)
+  const response = await callAI({ prompt: fullPrompt, modelId: options.modelId })
+  const seen = new Set<string>()
+  return response
+    .split(/[,\n]/)
+    .map((t) => t.trim().replace(/^["'#\-•\s]+|["']+$/g, '').trim())
+    .filter((t) => {
+      if (!t) return false
+      const key = t.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+}
+
+/**
  * Optimize text based on a user instruction.
  * If isFullDocument is true, the AI is told to return markdown and the result
  * is converted to ProseMirror JSON.  Otherwise plain text is returned.

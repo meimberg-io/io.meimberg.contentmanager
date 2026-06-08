@@ -25,6 +25,8 @@ export interface AiPrompts {
   headerImageArticle?: string
   /** LinkedIn post text generation (plain text, LinkedIn style) */
   linkedin?: string
+  /** Categorization tags generation (comma-separated, Content-Manager-internal) */
+  tags?: string
 }
 
 export interface Settings {
@@ -136,6 +138,15 @@ Anforderungen:
 
 Sprache: Deutsch.
 Antworte NUR mit dem LinkedIn-Beitragstext, keine Erklärung oder Meta-Kommentare.`,
+  tags: `Basierend auf dem folgenden Quellmaterial, generiere 4-8 prägnante Schlagworte (Tags) zur thematischen Kategorisierung des Beitrags.
+
+Anforderungen:
+- Kurze Begriffe oder kurze Wortgruppen (1-3 Wörter), die das Thema gut einordnen.
+- Keine Hashtags, keine Rauten (#), keine Nummerierung, keine Aufzählungszeichen.
+- Nur die Tags, getrennt durch Kommas, in einer einzigen Zeile.
+- Keine Erklärung, kein Meta-Kommentar.
+
+Sprache: Deutsch.`,
 }
 
 /**
