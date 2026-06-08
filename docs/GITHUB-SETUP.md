@@ -16,7 +16,8 @@ Initial configuration required for automated deployment of meimberg.io Contentma
 | `ADMIN_WHITELIST` | `oli@meimberg.io` | Allowed admin emails |
 | `MAILINBOX_USERNAME` | `bloginbox@meimberg.io` | Mail inbox for blog imports |
 | `PUBLER_API_URL` | `https://app.publer.com/api/v1` | Publer API base URL |
-| `PUBLER_WORKSPACE_ID` | *(your workspace id)* | Publer workspace ID |
+| `PUBLER_WORKSPACE_ID` | `6a25ddc6e770fb77d3008bb3` | Publer workspace ID (meimberg.io — **not** the Luxarise workspace) |
+| `PUBLER_LINKEDIN_ACCOUNT_ID` | `6a25de5690bc6179bad93a72` | Publer account ID of the LinkedIn profile (LinkedIn publishing target) |
 
 ## GitHub Secrets
 
@@ -58,7 +59,20 @@ Initial configuration required for automated deployment of meimberg.io Contentma
 
 | Name | Description |
 |------|-------------|
-| `PUBLER_API_KEY` | Publer API key |
+| `PUBLER_API_KEY` | Publer API key (Publer → Settings → Access; requires a Business plan with API access) |
+
+> **Obtaining the Publer IDs** (for `PUBLER_WORKSPACE_ID` / `PUBLER_LINKEDIN_ACCOUNT_ID`, e.g. after rotating the key):
+> ```bash
+> KEY="<publer-api-key>"
+> # Workspace ID (pick the "meimberg.io" workspace, not "Luxarise"):
+> curl -s https://app.publer.com/api/v1/workspaces \
+>   -H "Authorization: Bearer-API $KEY"
+> # LinkedIn account ID (use the workspace ID from above):
+> curl -s https://app.publer.com/api/v1/accounts \
+>   -H "Authorization: Bearer-API $KEY" \
+>   -H "Publer-Workspace-Id: <workspace-id>"
+> ```
+> Note: Publer sits behind Cloudflare, which blocks some bot user-agents (e.g. `python-urllib`) with error `1010` — use `curl` or Node `fetch`, not Python's stdlib HTTP client.
 
 ---
 
