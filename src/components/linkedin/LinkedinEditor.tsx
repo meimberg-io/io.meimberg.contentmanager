@@ -133,15 +133,21 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Model list for the standalone AI-settings panel.
+  // Model list + configured default for the standalone AI-settings panel.
+  // The "Default" label must reflect the model from settings (e.g. Opus), not the
+  // hard fallback constant — same source the generate route uses (settings.aiModel).
   useEffect(() => {
     if (isAttached) return;
-    fetch("/api/ai/models")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data) {
-          setAiModels(data.models || []);
-          setDefaultModel(data.defaultModel || "");
+    Promise.all([
+      fetch("/api/ai/models").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/settings").then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([modelsData, settingsData]) => {
+        if (modelsData) {
+          setAiModels(modelsData.models || []);
+          setDefaultModel(
+            settingsData?.settings?.aiModel || modelsData.defaultModel || ""
+          );
         }
       })
       .catch(() => {});
