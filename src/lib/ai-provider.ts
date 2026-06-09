@@ -3,7 +3,7 @@
  * 
  * Unified interface for multiple AI providers with vision capabilities:
  * - OpenAI (GPT-4o, GPT-4o Mini)
- * - Anthropic Claude (Claude Opus 4, Claude Sonnet 4, Claude Haiku 3.5)
+ * - Anthropic Claude (Claude Opus 4.8, Claude Sonnet 4.6, Claude Haiku 4.5)
  * - Google AI (Gemini 2.5 Flash, Gemini 2.5 Pro)
  */
 
@@ -22,9 +22,9 @@ export const AI_MODELS: AIModel[] = [
   { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', supportsVision: true },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', supportsVision: true },
   // Anthropic Claude
-  { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic', supportsVision: true },
-  { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic', supportsVision: true },
-  { id: 'claude-haiku-3-5-20241022', name: 'Claude Haiku 3.5', provider: 'anthropic', supportsVision: true },
+  { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', supportsVision: true },
+  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic', supportsVision: true },
+  { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', provider: 'anthropic', supportsVision: true },
   // Google AI (Gemini) - Updated model names
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google', supportsVision: true },
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google', supportsVision: true },
