@@ -131,7 +131,7 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
   const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
   const [showSource, setShowSource] = useState(!!post.sourceRaw || !!post.sourceSummarized);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Model list + configured default for the standalone AI-settings panel.
   // The "Default" label must reflect the model from settings (e.g. Opus), not the
@@ -621,11 +621,23 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
         <span className="text-[10px] text-muted-foreground">{text.length} chars</span>
       </div>
       <Textarea
-        ref={textareaRef}
+        ref={(el) => {
+          textareaRef.current = el;
+          // Auto-size to content (no inner scrollbar); grows on generate/optimize too.
+          if (el) {
+            el.style.height = "auto";
+            el.style.height = el.scrollHeight + "px";
+          }
+        }}
         value={text}
         onChange={(e) => setText(e.target.value)}
+        onInput={(e) => {
+          const t = e.currentTarget;
+          t.style.height = "auto";
+          t.style.height = t.scrollHeight + "px";
+        }}
         placeholder="Write the LinkedIn post text, or generate it from the source material…"
-        className="min-h-[200px] bg-secondary/40 text-sm whitespace-pre-wrap"
+        className="min-h-[280px] resize-none overflow-hidden bg-secondary/40 text-sm whitespace-pre-wrap"
       />
     </div>
   );
