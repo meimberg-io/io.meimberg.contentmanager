@@ -154,7 +154,7 @@ export default function SettingsPage() {
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
   const [allModels, setAllModels] = useState<AIModel[]>([]);
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
-  const [defaultModel, setDefaultModel] = useState<string>('gpt-4o');
+  const [defaultModel, setDefaultModel] = useState<string>('gpt-5.5');
   
   // AI Prompts State - keyed by prompt field name
   const [prompts, setPrompts] = useState<Record<string, string>>({});
@@ -197,7 +197,7 @@ export default function SettingsPage() {
           setAvailableModels(modelsData.models || []);
           setAllModels(modelsData.allModels || []);
           setAvailableProviders(modelsData.providers || []);
-          setDefaultModel(modelsData.defaultModel || 'gpt-4o');
+          setDefaultModel(modelsData.defaultModel || 'gpt-5.5');
         }
       } catch (error) {
         console.error('Failed to load data:', error);

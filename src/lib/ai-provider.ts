@@ -2,9 +2,9 @@
  * AI Provider Abstraction
  * 
  * Unified interface for multiple AI providers with vision capabilities:
- * - OpenAI (GPT-4o, GPT-4o Mini)
+ * - OpenAI (GPT-5.5, GPT-5.4 Mini)
  * - Anthropic Claude (Claude Opus 4.8, Claude Sonnet 4.6, Claude Haiku 4.5)
- * - Google AI (Gemini 2.5 Flash, Gemini 2.5 Pro)
+ * - Google AI (Gemini 3.5 Flash, Gemini 2.5 Pro, Gemini 3.1 Flash Lite)
  */
 
 export type AIProvider = 'openai' | 'anthropic' | 'google'
@@ -19,19 +19,19 @@ export interface AIModel {
 // Available models with vision support
 export const AI_MODELS: AIModel[] = [
   // OpenAI
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', supportsVision: true },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', supportsVision: true },
+  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', supportsVision: true },
+  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'openai', supportsVision: true },
   // Anthropic Claude
   { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', supportsVision: true },
   { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic', supportsVision: true },
   { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', provider: 'anthropic', supportsVision: true },
-  // Google AI (Gemini) - Updated model names
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google', supportsVision: true },
+  // Google AI (Gemini) - stable GA ids (Pro tier still latest at 2.5)
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'google', supportsVision: true },
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google', supportsVision: true },
-  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', provider: 'google', supportsVision: true },
+  { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', provider: 'google', supportsVision: true },
 ]
 
-export const DEFAULT_MODEL = 'gpt-4o'
+export const DEFAULT_MODEL = 'gpt-5.5'
 
 // API Keys from environment
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
