@@ -82,6 +82,12 @@
       "pos": 12,
       "display_name": "Image prompt (DALL-E)",
       "description": "Standalone posts only: prompt used to generate the LinkedIn image via DALL-E."
+    },
+    "cm_publer_label": {
+      "type": "text",
+      "pos": 13,
+      "display_name": "Publer slot label",
+      "description": "Publer label = posting slot/series (e.g. Standard, Series 1). Drives AutoSchedule into the matching timeslot. Defaults to Standard."
     }
   }
 }

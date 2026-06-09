@@ -303,6 +303,7 @@ export interface LinkedinPost {
   cm_publer_post_ids?: string;
   cm_tags?: string;
   cm_image_prompt?: string;
+  cm_publer_label?: string;
   component: "linkedin_post";
   _uid: string;
   [k: string]: unknown;

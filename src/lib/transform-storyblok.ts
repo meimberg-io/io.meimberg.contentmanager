@@ -112,6 +112,10 @@ export function transformStoryblokLinkedin(story: any): LinkedinPost {
       ? content.cm_publer_post_ids.split(',').map((id: string) => id.trim()).filter(Boolean)
       : undefined,
     publerPublishedAt: content.cm_publer_published_at || undefined,
+    // Publer slot label (MICM-13). Empty (legacy/older posts) → "Standard", the
+    // first DEFAULT_PUBLER_LABELS entry. Literal here to keep this transform free
+    // of the server-only settings module (it's imported client-side too).
+    publerLabel: content.cm_publer_label || 'Standard',
     createdAt: story.created_at,
     lastModified: story.updated_at || story.created_at,
   }

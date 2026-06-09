@@ -90,6 +90,8 @@ export interface LinkedinPost {
   // Publer
   publerPostIds?: string[];
   publerPublishedAt?: string;
+  /** Publer label = posting slot/series (MICM-13). Defaults to "Standard". */
+  publerLabel?: string;
   // Timestamps
   createdAt: string;
   lastModified: string;

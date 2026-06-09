@@ -33,7 +33,16 @@ export interface Settings {
   aiModel?: string
   aiPrompts?: AiPrompts
   notes?: string
+  /**
+   * Publer labels used as LinkedIn posting slots (MICM-13). Each label maps to a
+   * timeslot series in Publer's posting schedule; order = dropdown order, first
+   * entry = default. Empty/undefined → DEFAULT_PUBLER_LABELS.
+   */
+  publerLabels?: string[]
 }
+
+/** Default Publer label set; must match the labels configured in Publer's posting schedule (MICM-13). */
+export const DEFAULT_PUBLER_LABELS = ['Standard', 'Series 1', 'Series 2', 'Series 3']
 
 export const DEFAULT_PROMPTS: Required<AiPrompts> = {
   pagetitle: `Basierend auf dem Quellmaterial, generiere einen überzeugenden Blog-Titel. Der Titel sollte einprägsam sein und den Kern des Themas erfassen. Maximal 80 Zeichen. Gib NUR den Titel zurück, keine Erklärung. Sprache: Deutsch.`,

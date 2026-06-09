@@ -90,6 +90,7 @@ export async function POST(request: Request) {
       cm_source_summarized: body.cm_source_summarized || undefined,
       cm_ai_hint: body.cm_ai_hint || undefined,
       cm_origin: body.cm_origin === 'import' ? 'import' : 'create',
+      cm_publer_label: body.cm_publer_label || undefined,
     })
 
     return NextResponse.json(result)
@@ -132,6 +133,7 @@ export async function PATCH(request: Request) {
       'cm_content_confirmed_at',
       'cm_publer_published_at',
       'cm_publer_post_ids',
+      'cm_publer_label',
     ]
     const updates: Partial<LinkedinPostData> = {}
     for (const key of allowed) {

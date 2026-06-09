@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -12,13 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Sparkles, 
+import {
+  Sparkles,
   Save,
   Check,
   AlertCircle,
   StickyNote,
   RotateCcw,
+  CalendarClock,
+  Plus,
+  X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -127,6 +131,9 @@ const PROMPT_FIELDS: { key: string; label: string; description: string }[] = [
   { key: "linkedin", label: "LinkedIn Post", description: "Generates the LinkedIn post text (plain text, hook + short paragraphs + CTA, no hashtags/links)." },
 ];
 
+// Must match DEFAULT_PUBLER_LABELS in settings-storage.ts (MICM-13).
+const DEFAULT_PUBLER_LABELS = ["Standard", "Series 1", "Series 2", "Series 3"];
+
 interface AIModel {
   id: string;
   name: string;
@@ -163,6 +170,9 @@ export default function SettingsPage() {
   // Notes State
   const [notes, setNotes] = useState<string>('');
 
+  // Publer slot labels (MICM-13)
+  const [publerLabels, setPublerLabels] = useState<string[]>(DEFAULT_PUBLER_LABELS);
+
   // Load settings and models from API on mount
   useEffect(() => {
     async function loadData() {
@@ -178,6 +188,11 @@ export default function SettingsPage() {
           
           setSelectedModel(settings.aiModel || '');
           setNotes(settings.notes || '');
+          setPublerLabels(
+            Array.isArray(settings.publerLabels) && settings.publerLabels.length > 0
+              ? settings.publerLabels
+              : DEFAULT_PUBLER_LABELS
+          );
           
           const savedPrompts = settings.aiPrompts || {};
           const merged: Record<string, string> = {};
@@ -221,6 +236,7 @@ export default function SettingsPage() {
             aiModel: selectedModel || undefined,
             aiPrompts: prompts,
             notes,
+            publerLabels: publerLabels.map((l) => l.trim()).filter(Boolean),
           }
         })
       });
@@ -258,6 +274,16 @@ export default function SettingsPage() {
     setPrompts(prev => ({ ...prev, [key]: value }));
   };
 
+  const setLabelAt = (index: number, value: string) => {
+    setPublerLabels(prev => prev.map((l, i) => (i === index ? value : l)));
+  };
+  const removeLabel = (index: number) => {
+    setPublerLabels(prev => prev.filter((_, i) => i !== index));
+  };
+  const addLabel = () => {
+    setPublerLabels(prev => [...prev, ""]);
+  };
+
   const effectiveModel = selectedModel || defaultModel;
   const effectiveModelInfo = allModels.find(m => m.id === effectiveModel);
   const isModelAvailable = availableModels.some(m => m.id === effectiveModel);
@@ -288,7 +314,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="prompts" className="space-y-6">
-        <TabsList className="bg-muted/50 grid w-full grid-cols-3">
+        <TabsList className="bg-muted/50 grid w-full grid-cols-4">
           <TabsTrigger value="prompts" className="gap-2">
             <Sparkles className="h-4 w-4 text-blue-400" />
             Prompts
@@ -296,6 +322,10 @@ export default function SettingsPage() {
           <TabsTrigger value="model" className="gap-2">
             <Sparkles className="h-4 w-4 text-blue-400" />
             Model
+          </TabsTrigger>
+          <TabsTrigger value="publer" className="gap-2">
+            <CalendarClock className="h-4 w-4 text-[#0a66c2]" />
+            Publer
           </TabsTrigger>
           <TabsTrigger value="notes" className="gap-2">
             <StickyNote className="h-4 w-4" />
@@ -412,6 +442,58 @@ export default function SettingsPage() {
                 </p>
               </div>
             )}
+          </div>
+
+          <div className="flex justify-end">
+            <Button className="gap-2" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+              {isSaving ? 'Saved!' : 'Save Settings'}
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* Publer Tab */}
+        <TabsContent value="publer" className="space-y-6 animate-fade-in">
+          <div className="glass-card p-6 space-y-4">
+            <h2 className="font-display text-xl font-semibold">Publer Slot Labels</h2>
+            <p className="text-sm text-muted-foreground">
+              These labels map to the timeslot series in your Publer posting schedule. Each LinkedIn post
+              picks one; on publish it is auto-scheduled into the next free slot tagged with that label
+              (matched by name in Publer). The first label is the default for new posts.
+            </p>
+
+            <div className="space-y-2">
+              {publerLabels.map((label, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    value={label}
+                    onChange={(e) => setLabelAt(i, e.target.value)}
+                    placeholder="Label name (e.g. Series 1)"
+                    className="bg-secondary/50"
+                  />
+                  {i === 0 && (
+                    <Badge variant="outline" className="shrink-0 text-xs text-muted-foreground">
+                      Default
+                    </Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 text-muted-foreground/60 hover:bg-red-600 hover:text-white cursor-pointer"
+                    onClick={() => removeLabel(i)}
+                    disabled={publerLabels.length <= 1}
+                    title={publerLabels.length <= 1 ? "Keep at least one label" : "Remove label"}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <Button variant="outline" size="sm" className="gap-2" onClick={addLabel}>
+              <Plus className="h-3.5 w-3.5" />
+              Add label
+            </Button>
           </div>
 
           <div className="flex justify-end">

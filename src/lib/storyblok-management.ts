@@ -653,6 +653,8 @@ export interface LinkedinPostData {
   cm_content_confirmed_at?: string
   cm_publer_published_at?: string
   cm_publer_post_ids?: string
+  /** Publer label = posting slot/series (MICM-13). */
+  cm_publer_label?: string
 }
 
 /** Resolve a story by its UUID via the Management API (list endpoint). Returns the numeric id or null. */
@@ -721,6 +723,8 @@ export async function createLinkedinPost(
   )
   const content: Record<string, any> = {
     component: 'linkedin_post',
+    // Default Publer slot (MICM-13); overridden if the caller passed cm_publer_label.
+    cm_publer_label: 'Standard',
     ...mirroredSource,
     ...definedContentFields,
     ...(blogParentUuid ? { cm_blog_ref: blogParentUuid } : {}),

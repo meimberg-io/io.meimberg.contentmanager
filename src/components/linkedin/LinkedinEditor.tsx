@@ -80,6 +80,10 @@ const PROVIDER_LABELS: Record<string, string> = {
   google: "Gemini",
 };
 
+// Fallback Publer slot labels (MICM-13) until settings load / if none configured.
+// Mirrors DEFAULT_PUBLER_LABELS in settings-storage.ts (server-only, not importable here).
+const FALLBACK_PUBLER_LABELS = ["Standard", "Series 1", "Series 2", "Series 3"];
+
 interface LinkedinEditorProps {
   post: LinkedinPost;
   parent?: BlogParentInfo | null;
@@ -115,6 +119,9 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
   const [model, setModel] = useState<string | null>(null);
   const [aiModels, setAiModels] = useState<AIModel[]>([]);
   const [defaultModel, setDefaultModel] = useState("");
+  // Publer slot label (MICM-13) — selectable in both layouts, passed at publish time.
+  const [publerLabel, setPublerLabel] = useState(post.publerLabel || "Standard");
+  const [publerLabels, setPublerLabels] = useState<string[]>(FALLBACK_PUBLER_LABELS);
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generatingTags, setGeneratingTags] = useState(false);
@@ -153,11 +160,25 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
       .catch(() => {});
   }, [isAttached]);
 
+  // Publer slot labels from settings (MICM-13) — needed in both layouts, so this
+  // runs regardless of isAttached. Falls back to FALLBACK_PUBLER_LABELS if unset.
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const labels: string[] = data?.settings?.publerLabels;
+        if (Array.isArray(labels) && labels.length > 0) setPublerLabels(labels);
+      })
+      .catch(() => {});
+  }, []);
+
   const hasSource = !!sourceRaw || !!sourceSummarized;
   const tagsString = tags.join(", ");
+  const labelDirty = publerLabel !== (post.publerLabel || "Standard");
   const dirty = isAttached
-    ? text !== (post.linkedinText || "")
+    ? text !== (post.linkedinText || "") || labelDirty
     : text !== (post.linkedinText || "") ||
+      labelDirty ||
       sourceRaw !== (post.sourceRaw || "") ||
       sourceSummarized !== (post.sourceSummarized || "") ||
       aiHint !== (post.aiHint || "") ||
@@ -398,6 +419,7 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
         body: JSON.stringify({
           id: post.storyblokId,
           linkedin_text: text,
+          cm_publer_label: publerLabel,
           ...(!isAttached
             ? {
                 cm_source_raw: sourceRaw,
@@ -642,10 +664,34 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
     </div>
   );
 
+  // Keep a stored-but-unlisted label (e.g. after settings change) selectable.
+  const labelOptions =
+    publerLabel && !publerLabels.includes(publerLabel)
+      ? [publerLabel, ...publerLabels]
+      : publerLabels;
+
   const actions = (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Slot</Label>
+            <Select value={publerLabel} onValueChange={setPublerLabel}>
+              <SelectTrigger
+                className="h-8 w-[130px] bg-secondary/40 text-xs"
+                title="Publer slot/label — controls which posting-schedule timeslot this post lands in"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {labelOptions.map((l) => (
+                  <SelectItem key={l} value={l}>
+                    {l}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             size="sm"
             className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
@@ -962,8 +1008,8 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
             <AlertDialogTitle>{isPublished ? "Re-publish to LinkedIn?" : "Publish to LinkedIn?"}</AlertDialogTitle>
             <AlertDialogDescription>
               {isPublished
-                ? "If this post is still in the Publer queue it will be replaced (no duplicate). If it has already been delivered, publishing is blocked."
-                : "This schedules the post to the end of your LinkedIn queue via Publer."}
+                ? `If this post is still in the Publer queue it will be replaced (no duplicate) in the "${publerLabel}" slot. If it has already been delivered, publishing is blocked.`
+                : `This auto-schedules the post into the next free "${publerLabel}" slot of your LinkedIn posting schedule via Publer.`}
               {isAttached && " The published blog link will be appended automatically."}
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -19,8 +19,9 @@ import {
 
 /**
  * POST /api/publishing/linkedin
- * Publish a LinkedIn post to Publer (queue end). Replaces the existing queued
- * entry while still scheduled; blocks hard if already published (MICM-12).
+ * Publish a LinkedIn post to Publer via AutoSchedule into the post's slot label
+ * (MICM-13). Replaces the existing queued entry while still scheduled; blocks
+ * hard if already published (MICM-12).
  * Body: { id: <linkedin storyblokId> }. Protected: Requires authentication.
  */
 export async function POST(request: Request) {
@@ -54,6 +55,11 @@ export async function POST(request: Request) {
     if (!text.trim()) {
       return NextResponse.json({ error: 'LinkedIn text is empty — nothing to publish' }, { status: 400 })
     }
+
+    // Publer slot label (MICM-13) routes the post into the matching timeslot series
+    // via AutoSchedule. Default "Standard" so publishing always works (incl. legacy
+    // posts that predate the field) — matches the "Default Standard" product choice.
+    const label: string = (content.cm_publer_label || '').trim() || 'Standard'
 
     const blogUuid: string | undefined = content.cm_blog_ref || undefined
     const isAttached = !!blogUuid
@@ -107,6 +113,7 @@ export async function POST(request: Request) {
     const { jobId, postIds } = await scheduleLinkedinPost({
       text: finalText,
       accountId: getLinkedinAccountId()!,
+      label,
       mediaUrl,
       mediaName: `linkedin-${story.slug || id}`,
     })
@@ -123,8 +130,8 @@ export async function POST(request: Request) {
       postIds,
       jobId,
       message: replaced
-        ? 'LinkedIn post replaced in the queue.'
-        : 'LinkedIn post scheduled to the end of the queue.',
+        ? `LinkedIn post replaced in the "${label}" slot queue.`
+        : `LinkedIn post auto-scheduled into the next free "${label}" slot.`,
     })
   } catch (error: any) {
     console.error('[Publer LinkedIn] Error:', error.message)
