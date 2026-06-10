@@ -66,6 +66,7 @@ export async function POST(request: Request) {
 
     // Hard publish guard (MICM-12 AK6): attached post requires a published parent blog.
     let blogUrl: string | undefined
+    let blogImageUrl: string | undefined
     if (isAttached) {
       const blog = await resolveBlogStoryByUuid(blogUuid!)
       if (!blog) {
@@ -79,6 +80,11 @@ export async function POST(request: Request) {
         )
       }
       blogUrl = preview.url
+      // Upload the blog's OG image (header/teaser) as media: LinkedIn does not
+      // reliably render link-preview cards for API posts, so relying on the
+      // auto-scraped OG card left attached posts imageless. Send the image
+      // explicitly; the blog link stays appended in the text.
+      blogImageUrl = preview.imageUrl
     }
 
     // Replace-while-queued / block-if-published (MICM-12 AK5).
@@ -106,8 +112,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // Media (MICM-12 AK2): attached → none (OG card); standalone → own image if present.
-    const mediaUrl = !isAttached ? content.linkedin_image?.filename || undefined : undefined
+    // Media: standalone → own image; attached → the blog's OG image (header/teaser),
+    // uploaded explicitly so the post actually carries an image (MICM-13 follow-up).
+    const mediaUrl = isAttached
+      ? blogImageUrl
+      : content.linkedin_image?.filename || undefined
 
     const finalText = formatForLinkedIn(text, blogUrl)
     const { jobId, postIds } = await scheduleLinkedinPost({
