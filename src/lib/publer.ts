@@ -614,21 +614,25 @@ function extractPublerPostIds(jobResult: any): string[] {
 }
 
 /**
- * Schedule a single LinkedIn post to the end of the queue (MICM-12 AK3).
- * - With mediaUrl (standalone image): upload via uploadMediaFromUrl, type 'photo'.
+ * Publish a single LinkedIn post *immediately* via Publer (MICM-17).
+ * The Content Manager now owns all timing (the scheduler decides WHEN and calls this
+ * at the slot moment), so Publer is used as a plain "post now" API: the post is
+ * scheduled with an explicit `scheduled_at` of now — no AutoSchedule labels/range.
+ * - With mediaUrl (image): upload via uploadMediaFromUrl, type 'photo'.
  * - Without media: type 'status' (text-only; an appended link unfurls into a card).
  * Returns the job id and the real Publer post ids extracted from the job result.
+ *
+ * NOTE: the immediate-post contract (state 'scheduled' + per-post `scheduled_at` = now)
+ * follows Publer's documented scheduling shape; verify against the live API on rollout.
  */
 export async function scheduleLinkedinPost(params: {
   text: string
   accountId: string
-  /** Publer label = posting slot/series; routes the post into the matching schedule timeslots (MICM-13). */
-  label: string
   mediaUrl?: string
   mediaName?: string
 }): Promise<{ jobId: string; postIds: string[] }> {
   const headers = getPubHeaders()
-  const { text, accountId, label, mediaUrl, mediaName } = params
+  const { text, accountId, mediaUrl, mediaName } = params
 
   let media: Array<{ id: string; type: string }> | undefined
   if (mediaUrl) {
@@ -642,20 +646,16 @@ export async function scheduleLinkedinPost(params: {
   }
   if (media) networkConfig.media = media
 
-  // AutoSchedule (MICM-13): Publer picks the next free timeslot tagged with `label`
-  // within the range. Labels match by name (case-insensitive). This replaces the
-  // old `share_last` "end of queue" behaviour so posts honour the posting schedule.
-  const now = new Date()
-  const end = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000) // +90 days
+  // Post immediately: explicit `scheduled_at` = now, no AutoSchedule label/range (MICM-17).
+  const scheduledAt = new Date().toISOString()
   const body = {
     bulk: {
       state: 'scheduled',
       posts: [
         {
           networks: { linkedin: networkConfig },
-          accounts: [{ id: accountId, labels: [label] }],
-          auto: true,
-          range: { start_date: now.toISOString(), end_date: end.toISOString() },
+          accounts: [{ id: accountId }],
+          scheduled_at: scheduledAt,
         },
       ],
     },

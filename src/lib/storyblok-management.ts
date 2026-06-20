@@ -658,7 +658,7 @@ export interface LinkedinPostData {
 }
 
 /** Resolve a story by its UUID via the Management API (list endpoint). Returns the numeric id or null. */
-async function getStoryIdByUuid(uuid: string): Promise<number | null> {
+export async function getStoryIdByUuid(uuid: string): Promise<number | null> {
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
   }

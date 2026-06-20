@@ -1,41 +1,20 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-guard'
-import {
-  getLinkedinPostById,
-  updateLinkedinPost,
-  resolveBlogStoryByUuid,
-} from '@/lib/storyblok-management'
-import { buildBlogLinkPreview } from '@/lib/linkedin-link'
-import {
-  formatForLinkedIn,
-  scheduleLinkedinPost,
-  getPublerPostState,
-  deletePublerPost,
-  isPublishedState,
-  isQueuedState,
-  isLinkedinPublerConfigured,
-  getLinkedinAccountId,
-} from '@/lib/publer'
+import { publishLinkedinNow } from '@/lib/linkedin-publish'
 
 /**
  * POST /api/publishing/linkedin
- * Publish a LinkedIn post to Publer via AutoSchedule into the post's slot label
- * (MICM-13). Replaces the existing queued entry while still scheduled; blocks
- * hard if already published (MICM-12).
- * Body: { id: <linkedin storyblokId> }. Protected: Requires authentication.
+ * Manually publish a LinkedIn post to Publer immediately (MICM-17). Shares the
+ * publishLinkedinNow() orchestration with the scheduler (MICM-14): the Content
+ * Manager owns the timing, Publer is a plain "post now" API. Replace-while-queued /
+ * block-if-published idempotency lives inside publishLinkedinNow.
+ * Body: { id: <linkedin storyblokId> }. Protected: requires authentication.
  */
 export async function POST(request: Request) {
   try {
     await requireAuth()
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 401 })
-  }
-
-  if (!isLinkedinPublerConfigured()) {
-    return NextResponse.json(
-      { error: 'Publer/LinkedIn not configured (need PUBLER_API_KEY, PUBLER_WORKSPACE_ID, PUBLER_LINKEDIN_ACCOUNT_ID)' },
-      { status: 500 }
-    )
   }
 
   try {
@@ -45,105 +24,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'LinkedIn post id required' }, { status: 400 })
     }
 
-    const story = await getLinkedinPostById(id)
-    if (!story) {
-      return NextResponse.json({ error: 'LinkedIn post not found' }, { status: 404 })
-    }
-
-    const content = story.content || {}
-    const text: string = content.linkedin_text || ''
-    if (!text.trim()) {
-      return NextResponse.json({ error: 'LinkedIn text is empty — nothing to publish' }, { status: 400 })
-    }
-
-    // Publer slot label (MICM-13) routes the post into the matching timeslot series
-    // via AutoSchedule. Default "Standard" so publishing always works (incl. legacy
-    // posts that predate the field) — matches the "Default Standard" product choice.
-    const label: string = (content.cm_publer_label || '').trim() || 'Standard'
-
-    const blogUuid: string | undefined = content.cm_blog_ref || undefined
-    const isAttached = !!blogUuid
-
-    // Hard publish guard (MICM-12 AK6): attached post requires a published parent blog.
-    let blogUrl: string | undefined
-    let blogImageUrl: string | undefined
-    if (isAttached) {
-      const blog = await resolveBlogStoryByUuid(blogUuid!)
-      if (!blog) {
-        return NextResponse.json({ error: 'Parent blog not found — cannot resolve link' }, { status: 400 })
-      }
-      const preview = buildBlogLinkPreview(blogUuid!, blog)
-      if (!preview.published) {
-        return NextResponse.json(
-          { error: 'Parent blog is not published yet. Publish the blog first, then publish to LinkedIn.' },
-          { status: 409 }
-        )
-      }
-      blogUrl = preview.url
-      // Upload the blog's OG image (header/teaser) as media: LinkedIn does not
-      // reliably render link-preview cards for API posts, so relying on the
-      // auto-scraped OG card left attached posts imageless. Send the image
-      // explicitly; the blog link stays appended in the text.
-      blogImageUrl = preview.imageUrl
-    }
-
-    // Replace-while-queued / block-if-published (MICM-12 AK5).
-    const existingIds: string[] = (content.cm_publer_post_ids || '')
-      .split(',')
-      .map((s: string) => s.trim())
-      .filter(Boolean)
-
-    let replaced = false
-    if (existingIds.length > 0) {
-      const states = await Promise.all(
-        existingIds.map(async (pid) => ({ pid, state: await getPublerPostState(pid).catch(() => 'unknown') }))
-      )
-      if (states.some((s) => isPublishedState(s.state))) {
-        return NextResponse.json(
-          { error: 'This post is already published on LinkedIn. Reset it before publishing again.' },
-          { status: 409 }
-        )
-      }
-      // Delete still-queued entries so we don't create a duplicate.
-      const queued = states.filter((s) => isQueuedState(s.state))
-      for (const { pid } of queued) {
-        await deletePublerPost(pid)
-        replaced = true
-      }
-    }
-
-    // Media: standalone → own image; attached → the blog's OG image (header/teaser),
-    // uploaded explicitly so the post actually carries an image (MICM-13 follow-up).
-    const mediaUrl = isAttached
-      ? blogImageUrl
-      : content.linkedin_image?.filename || undefined
-
-    const finalText = formatForLinkedIn(text, blogUrl)
-    const { jobId, postIds } = await scheduleLinkedinPost({
-      text: finalText,
-      accountId: getLinkedinAccountId()!,
-      label,
-      mediaUrl,
-      mediaName: `linkedin-${story.slug || id}`,
-    })
-
-    // Persist real post ids + timestamp; story stays draft-only (MICM-12 AK4).
-    await updateLinkedinPost(id, {
-      cm_publer_post_ids: postIds.length ? postIds.join(',') : jobId,
-      cm_publer_published_at: new Date().toISOString(),
-    })
+    const result = await publishLinkedinNow(id)
 
     return NextResponse.json({
       success: true,
-      replaced,
-      postIds,
-      jobId,
-      message: replaced
-        ? `LinkedIn post replaced in the "${label}" slot queue.`
-        : `LinkedIn post auto-scheduled into the next free "${label}" slot.`,
+      replaced: result.replaced,
+      postIds: result.postIds,
+      jobId: result.jobId,
+      message: result.replaced
+        ? 'LinkedIn post replaced and re-published.'
+        : 'LinkedIn post published to LinkedIn.',
     })
   } catch (error: any) {
-    console.error('[Publer LinkedIn] Error:', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const status = typeof error?.status === 'number' ? error.status : 500
+    if (status >= 500) console.error('[Publer LinkedIn] Error:', error.message)
+    return NextResponse.json({ error: error.message }, { status })
   }
 }
