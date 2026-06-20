@@ -78,7 +78,7 @@ function zonedWallClockToUtc(
  * The most recent slot occurrence at or before `now`, across all weekly slots.
  * Returns null if the schedule has no slots.
  */
-export function latestOccurrence(now: Date, schedule: Schedule): Date | null {
+export function latestOccurrence(now: Date, schedule: Pick<Schedule, 'slots' | 'timezone'>): Date | null {
   const tz = schedule.timezone || DEFAULT_TZ
   if (!schedule.slots?.length) return null
 
@@ -106,7 +106,7 @@ export function latestOccurrence(now: Date, schedule: Schedule): Date | null {
  * The next `count` slot occurrences strictly after `now`, ascending. Used to project
  * when queued posts will go out (queue index i → nextOccurrences[i]).
  */
-export function nextOccurrences(now: Date, schedule: Schedule, count: number): Date[] {
+export function nextOccurrences(now: Date, schedule: Pick<Schedule, 'slots' | 'timezone'>, count: number): Date[] {
   const tz = schedule.timezone || DEFAULT_TZ
   if (!schedule.slots?.length || count <= 0) return []
 
@@ -130,7 +130,7 @@ export function nextOccurrences(now: Date, schedule: Schedule, count: number): D
 }
 
 /** Projected publish date for the entry at queue position `index` (0 = next slot). */
-export function projectedDateForIndex(now: Date, schedule: Schedule, index: number): Date | null {
+export function projectedDateForIndex(now: Date, schedule: Pick<Schedule, 'slots' | 'timezone'>, index: number): Date | null {
   if (index < 0) return null
   const occ = nextOccurrences(now, schedule, index + 1)
   return occ[index] ?? null

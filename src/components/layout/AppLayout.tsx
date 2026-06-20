@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Linkedin,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ const navItems = [
   { label: "Import", icon: Upload, path: "/import" },
   { label: "All Posts", icon: FileText, path: "/posts" },
   { label: "LinkedIn", icon: Linkedin, path: "/linkedin" },
+  { label: "Geplant", icon: CalendarClock, path: "/schedule" },
   { label: "Settings", icon: Settings, path: "/settings" },
 ];
 
