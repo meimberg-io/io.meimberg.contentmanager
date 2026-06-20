@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'scheduleId und orderedUuids[] erforderlich' }, { status: 400 })
     }
 
-    const settings = await getSettings()
+    const settings = await getSettings({ fresh: true })
     const schedules: Schedule[] = Array.isArray(settings.schedules)
       ? JSON.parse(JSON.stringify(settings.schedules))
       : []

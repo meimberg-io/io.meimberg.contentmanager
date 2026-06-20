@@ -168,6 +168,12 @@ export interface ScheduleSlot {
 export interface ScheduleQueueEntry {
   storyUuid: string;
   typ: ScheduleEntryType;
+  /** Consecutive technical publish failures (MICM-20). */
+  errorCount?: number;
+  /** Last technical error message (MICM-20). */
+  lastError?: string;
+  /** ISO timestamp of the last error (MICM-20). */
+  lastErrorAt?: string;
 }
 
 /**
@@ -185,4 +191,6 @@ export interface Schedule {
   queue: ScheduleQueueEntry[];
   /** ISO timestamp of the most recently processed slot occurrence; null = never fired. Set by the engine (MICM-17). */
   lastFiredAt: string | null;
+  /** Entries pulled out of the queue after repeated failures — need user attention (MICM-20). */
+  sidelined?: ScheduleQueueEntry[];
 }

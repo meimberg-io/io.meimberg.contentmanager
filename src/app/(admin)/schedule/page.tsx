@@ -34,6 +34,8 @@ interface PlanEntry {
   storyId: string;
   exists: boolean;
   published: boolean;
+  errorCount?: number;
+  lastError?: string;
 }
 interface PlanSchedule {
   id: string;
@@ -41,6 +43,7 @@ interface PlanSchedule {
   timezone: string;
   slots: ScheduleSlot[];
   entries: PlanEntry[];
+  sidelined: PlanEntry[];
 }
 
 const WEEKDAY_SHORT: Record<number, string> = { 1: "Mo", 2: "Di", 3: "Mi", 4: "Do", 5: "Fr", 6: "Sa", 0: "So" };
@@ -112,6 +115,12 @@ function EntryRow({
           bereits veröffentlicht
         </Badge>
       )}
+      {entry.errorCount ? (
+        <Badge variant="outline" className="shrink-0 gap-1 border-orange-500/40 text-xs text-orange-400" title={entry.lastError}>
+          <AlertTriangle className="h-3 w-3" />
+          Fehler ({entry.errorCount})
+        </Badge>
+      ) : null}
       <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
         {projected ? formatSlot(projected, timezone) : "—"}
       </span>
@@ -268,6 +277,36 @@ export default function SchedulePage() {
                     </div>
                   </SortableContext>
                 </DndContext>
+              )}
+
+              {sched.sidelined.length > 0 && (
+                <div className="space-y-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-red-400">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Fehler / zu prüfen ({sched.sidelined.length})
+                  </div>
+                  {sched.sidelined.map((entry) => (
+                    <div
+                      key={entry.storyUuid}
+                      className="flex items-center gap-3 rounded-md border border-border/40 bg-background/40 px-3 py-2"
+                    >
+                      <Badge variant="outline" className="shrink-0 text-xs text-muted-foreground">{TYP_LABEL[entry.typ]}</Badge>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm">{entry.title}</div>
+                        {entry.lastError && <div className="truncate text-xs text-red-400/80">{entry.lastError}</div>}
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 shrink-0 text-muted-foreground/60 hover:bg-red-600 hover:text-white"
+                        onClick={() => removeEntry(entry.storyUuid)}
+                        title="Verwerfen (aus dem Plan nehmen)"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           ))}

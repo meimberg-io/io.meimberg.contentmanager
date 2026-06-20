@@ -170,9 +170,9 @@ Sprache: Deutsch.`,
 /**
  * Get settings from system config
  */
-export async function getSettings(): Promise<Settings> {
+export async function getSettings(options?: { fresh?: boolean }): Promise<Settings> {
   try {
-    const config = await getSystemConfig()
+    const config = await getSystemConfig(options)
     return config.settings || {}
   } catch (error) {
     console.error('Failed to get settings:', error)

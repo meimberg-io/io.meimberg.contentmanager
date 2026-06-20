@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const settings = await getSettings()
+    const settings = await getSettings({ fresh: true })
     const schedules: Schedule[] = Array.isArray(settings.schedules)
       ? JSON.parse(JSON.stringify(settings.schedules))
       : []
@@ -84,16 +84,19 @@ export async function DELETE(request: Request) {
     const { storyUuid } = await request.json()
     if (!storyUuid) return NextResponse.json({ error: 'storyUuid erforderlich' }, { status: 400 })
 
-    const settings = await getSettings()
+    const settings = await getSettings({ fresh: true })
     const schedules: Schedule[] = Array.isArray(settings.schedules)
       ? JSON.parse(JSON.stringify(settings.schedules))
       : []
 
     let removed = false
     for (const s of schedules) {
-      const before = s.queue.length
+      const beforeQ = s.queue.length
       s.queue = s.queue.filter((e) => e.storyUuid !== storyUuid)
-      if (s.queue.length !== before) removed = true
+      // Also clear it from the sidelined ("Fehler/zu prüfen") bucket (MICM-20).
+      const beforeS = s.sidelined?.length ?? 0
+      if (s.sidelined) s.sidelined = s.sidelined.filter((e) => e.storyUuid !== storyUuid)
+      if (s.queue.length !== beforeQ || (s.sidelined?.length ?? 0) !== beforeS) removed = true
     }
 
     if (removed) await updateSettings({ schedules })

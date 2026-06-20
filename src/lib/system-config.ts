@@ -88,13 +88,14 @@ async function getSystemStoryId(): Promise<number | null> {
 /**
  * Get the current system config (with in-memory TTL cache to avoid redundant Storyblok calls)
  */
-export async function getSystemConfig(): Promise<SystemConfig> {
+export async function getSystemConfig(options?: { fresh?: boolean }): Promise<SystemConfig> {
   if (!MANAGEMENT_TOKEN) {
     return {}
   }
 
-  // Return cached config if still fresh
-  if (cachedConfig && Date.now() < cachedConfig.expiresAt) {
+  // Return cached config if still fresh (unless an explicit fresh read is requested,
+  // e.g. the scheduler tick doing a read-modify-write — MICM-20 AK6).
+  if (!options?.fresh && cachedConfig && Date.now() < cachedConfig.expiresAt) {
     return cachedConfig.data
   }
 
