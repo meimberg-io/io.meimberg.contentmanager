@@ -25,6 +25,7 @@ import {
   Plus,
   X,
   Trash2,
+  Play,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -233,6 +234,7 @@ export default function SettingsPage() {
   // Publishing schedules (MICM-14)
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
+  const [runningTick, setRunningTick] = useState(false);
 
   // Load settings and models from API on mount
   useEffect(() => {
@@ -376,6 +378,23 @@ export default function SettingsPage() {
     setSchedules((prev) =>
       prev.map((s) => (s.id === id ? { ...s, slots: s.slots.map((sl, i) => (i === idx ? { ...sl, ...patch } : sl)) } : s))
     );
+
+  // Manually run the scheduler tick (MICM-16) — session-authenticated; the cron
+  // endpoint also accepts a CRON_SECRET bearer for the headless ansible trigger.
+  const runSchedulerNow = async () => {
+    setRunningTick(true);
+    try {
+      const res = await fetch("/api/cron/tick", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Tick fehlgeschlagen");
+      const fired = Array.isArray(data?.results) ? data.results.filter((r: { fired?: boolean }) => r.fired).length : 0;
+      toast({ title: "Scheduler ausgeführt", description: `${fired} Beitrag/Beiträge veröffentlicht.` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Fehler", description: e instanceof Error ? e.message : "Tick fehlgeschlagen" });
+    } finally {
+      setRunningTick(false);
+    }
+  };
 
   const effectiveModel = selectedModel || defaultModel;
   const effectiveModelInfo = allModels.find(m => m.id === effectiveModel);
@@ -606,10 +625,16 @@ export default function SettingsPage() {
           <div className="glass-card p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-xl font-semibold">Veröffentlichungs-Schedules</h2>
-              <Button variant="outline" size="sm" className="gap-2" onClick={addSchedule}>
-                <Plus className="h-3.5 w-3.5" />
-                Schedule
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="gap-2" onClick={runSchedulerNow} disabled={runningTick}>
+                  <Play className="h-3.5 w-3.5" />
+                  {runningTick ? "Läuft…" : "Jetzt ausführen"}
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={addSchedule}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Schedule
+                </Button>
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">
               Ein Schedule ist eine Liste wöchentlich wiederkehrender Zeit-Slots (Zeitzone {SCHEDULE_TIMEZONE}).
