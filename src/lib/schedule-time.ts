@@ -135,3 +135,9 @@ export function projectedDateForIndex(now: Date, schedule: Pick<Schedule, 'slots
   const occ = nextOccurrences(now, schedule, index + 1)
   return occ[index] ?? null
 }
+
+/** Format an instant as "YYYY-MM-DD" in the given timezone (matches the blog `date` field). */
+export function ymdInZone(date: Date, timeZone: string = DEFAULT_TZ): string {
+  // en-CA renders ISO-style YYYY-MM-DD.
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
+}

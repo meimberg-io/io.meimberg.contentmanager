@@ -30,7 +30,7 @@ import { getSettings, updateSettings } from '@/lib/settings-storage'
 import { publishPost, getStoryIdByUuid, resolveBlogStoryByUuid } from '@/lib/storyblok-management'
 import { fetchLinkedinPostsByBlogUuid } from '@/lib/storyblok'
 import { publishLinkedinNow } from '@/lib/linkedin-publish'
-import { latestOccurrence } from '@/lib/schedule-time'
+import { latestOccurrence, ymdInZone } from '@/lib/schedule-time'
 
 /** Consecutive technical failures before an item is moved to the sidelined bucket. */
 const RETRY_CAP = 3
@@ -96,7 +96,7 @@ export async function runScheduleTick(now: Date = new Date()): Promise<TickResul
     }
 
     const entry = schedule.queue[0]
-    const outcome = await publishEntry(entry)
+    const outcome = await publishEntry(entry, occ, schedule.timezone || 'Europe/Berlin')
 
     if (outcome.ok) {
       schedule.queue = schedule.queue.slice(1)
@@ -189,7 +189,7 @@ async function isPublishedOrMissing(entry: ScheduleQueueEntry): Promise<boolean>
  * its attached, content-complete LinkedIn posts in the same slot (coupling, MICM-14).
  * Returns an outcome rather than throwing so the caller can apply retry/sideline.
  */
-async function publishEntry(entry: ScheduleQueueEntry): Promise<PublishOutcome> {
+async function publishEntry(entry: ScheduleQueueEntry, occ: Date, tz: string): Promise<PublishOutcome> {
   let numericId: number | null
   try {
     numericId = await getStoryIdByUuid(entry.storyUuid)
@@ -208,8 +208,9 @@ async function publishEntry(entry: ScheduleQueueEntry): Promise<PublishOutcome> 
   }
 
   // blog | article: publish the story first (so the LinkedIn 409 guard passes).
+  // Set the publish date to the slot date (MICM-30) so RSS/sorting get real dates.
   try {
-    await publishPost(String(numericId))
+    await publishPost(String(numericId), { overrideDate: ymdInZone(occ, tz) })
   } catch (e: any) {
     return { ok: false, error: e?.message || 'Blog-Publish fehlgeschlagen' }
   }

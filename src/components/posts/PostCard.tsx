@@ -29,6 +29,8 @@ interface PostCardProps {
   viewMode?: "grid" | "list";
   hideActions?: boolean;
   selectionMode?: boolean;
+  /** Projected publish date ("YYYY-MM-DD") if the post is scheduled (MICM-30). */
+  scheduledAt?: string;
 }
 
 function OriginIcon({ origin }: { origin?: 'import' | 'create' }) {
@@ -63,7 +65,7 @@ function OriginIcon({ origin }: { origin?: 'import' | 'create' }) {
   return null
 }
 
-export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideActions = false, selectionMode = false }: PostCardProps) {
+export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideActions = false, selectionMode = false, scheduledAt }: PostCardProps) {
   const router = useRouter();
 
   if (viewMode === "list") {
@@ -112,10 +114,10 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
           {post.origin && (
             <OriginIcon origin={post.origin} />
           )}
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {post.date || 'No date'}
+          <span className={cn("text-xs whitespace-nowrap", scheduledAt ? "text-blue-400" : "text-muted-foreground")} title={scheduledAt ? "Geplanter Veröffentlichungstermin" : undefined}>
+            {scheduledAt || post.date || 'No date'}
           </span>
-          <StatusRow status={post.status} />
+          <StatusRow status={post.status} scheduled={!!scheduledAt} />
         </div>
 
         {!hideActions && (
@@ -182,11 +184,11 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{post.abstract}</p>
 
         <div className="flex items-center justify-between mt-3">
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className={cn("flex items-center gap-1.5 text-xs", scheduledAt ? "text-blue-400" : "text-muted-foreground")} title={scheduledAt ? "Geplanter Veröffentlichungstermin" : undefined}>
             {post.origin && <OriginIcon origin={post.origin} />}
-            {post.date || 'No date'}
+            {scheduledAt || post.date || 'No date'}
           </span>
-          <StatusRow status={post.status} />
+          <StatusRow status={post.status} scheduled={!!scheduledAt} />
         </div>
       </div>
     </div>

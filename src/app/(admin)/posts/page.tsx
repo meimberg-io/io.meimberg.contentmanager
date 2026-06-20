@@ -40,6 +40,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
+import { projectedDateForIndex, ymdInZone } from "@/lib/schedule-time";
 import { toast } from "@/hooks/use-toast";
 
 // Multi-state filter
@@ -156,6 +157,26 @@ function StatusFilterGrid({
   );
 }
 
+// "Geplant" filter row (MICM-30): single blue toggle aligned to the green column of the grid.
+function ScheduledFilterRow({ active, count, onClick }: { active: boolean; count: number; onClick: () => void }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 items-center">
+      <span className="text-sm">Geplant</span>
+      <div className="min-w-[28px] h-7" />
+      <div className="min-w-[28px] h-7" />
+      <button
+        onClick={onClick}
+        className={cn(
+          "min-w-[28px] h-7 px-2 rounded-md text-xs font-medium transition-all flex items-center justify-center",
+          active ? "bg-blue-500 text-white" : "bg-blue-500/20 text-blue-400 hover:bg-blue-500/40"
+        )}
+      >
+        {active ? <Check className="h-3 w-3" /> : (count || '')}
+      </button>
+    </div>
+  );
+}
+
 function AllPostsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -175,6 +196,8 @@ function AllPostsPageContent() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [scheduledMap, setScheduledMap] = useState<Record<string, string>>({});
+  const [scheduledOnly, setScheduledOnly] = useState(false);
 
   // Sync state FROM URL
   useEffect(() => {
@@ -189,6 +212,7 @@ function AllPostsPageContent() {
     setViewMode(urlView === 'grid' ? 'grid' : 'list');
     setSearchQuery(urlSearch);
     setFilters(urlFilters);
+    setScheduledOnly(searchParams.get('sched') === '1');
     setIsInitialized(true);
   }, [searchParams]);
 
@@ -208,7 +232,8 @@ function AllPostsPageContent() {
       if (publer) params.set('publer', publer);
       if (searchQuery) params.set('q', searchQuery);
       if (viewMode === 'grid') params.set('view', 'grid');
-      
+      if (scheduledOnly) params.set('sched', '1');
+
       const queryString = params.toString();
       const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
       
@@ -216,7 +241,7 @@ function AllPostsPageContent() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [filters, searchQuery, viewMode, pathname, router, isInitialized]);
+  }, [filters, searchQuery, viewMode, scheduledOnly, pathname, router, isInitialized]);
 
   const handleSelect = (id: string, selected: boolean) => {
     const newSelected = new Set(selectedPosts);
@@ -231,14 +256,30 @@ function AllPostsPageContent() {
   useEffect(() => {
     async function loadData() {
       try {
-        const response = await fetch('/api/posts');
-        if (!response.ok) {
-          throw new Error(`Failed to fetch posts (${response.status})`);
+        const [postsRes, scheduleRes] = await Promise.all([
+          fetch('/api/posts'),
+          fetch('/api/schedule').catch(() => null),
+        ]);
+        if (!postsRes.ok) {
+          throw new Error(`Failed to fetch posts (${postsRes.status})`);
         }
-        const data = await response.json();
-        
+        const data = await postsRes.json();
         const transformedPosts = (data.posts || []).map(transformStoryblokBlog);
         setPosts(transformedPosts);
+
+        // Map storyUuid -> projected publish date for scheduled posts (MICM-30).
+        if (scheduleRes && scheduleRes.ok) {
+          const sched = await scheduleRes.json();
+          const now = new Date();
+          const map: Record<string, string> = {};
+          for (const s of sched.schedules || []) {
+            (s.entries || []).forEach((e: { storyUuid: string }, i: number) => {
+              const at = projectedDateForIndex(now, s, i);
+              if (at) map[e.storyUuid] = ymdInZone(at, s.timezone || 'Europe/Berlin');
+            });
+          }
+          setScheduledMap(map);
+        }
       } catch (error) {
         console.error('Failed to load data:', error);
       } finally {
@@ -304,11 +345,12 @@ function AllPostsPageContent() {
       publishedPubler: { ...defaultFilter },
     });
     setSearchQuery("");
+    setScheduledOnly(false);
     router.replace(pathname, { scroll: false });
   };
 
   const isFilterActive = (f: StatusFilter) => f.red || f.yellow || f.green;
-  const hasActiveFilters = Object.values(filters).some(isFilterActive) || searchQuery;
+  const hasActiveFilters = Object.values(filters).some(isFilterActive) || !!searchQuery || scheduledOnly;
 
   const matchesStatusFilter = (status: { completed: boolean; color: string }, filter: StatusFilter): boolean => {
     if (!filter.red && !filter.yellow && !filter.green) return true;
@@ -358,10 +400,10 @@ function AllPostsPageContent() {
   const publishedCounts = getStatusCounts('published');
   const publerCounts = getStatusCounts('publishedPubler');
 
-  const filteredPosts = posts.filter((post) => {
+  const baseFiltered = posts.filter((post) => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      const matchesSearch = 
+      const matchesSearch =
         post.pagetitle.toLowerCase().includes(query) ||
         post.abstract.toLowerCase().includes(query) ||
         post.teasertitle.toLowerCase().includes(query);
@@ -374,6 +416,9 @@ function AllPostsPageContent() {
 
     return true;
   });
+
+  const scheduledCount = baseFiltered.filter((post) => scheduledMap[post.id]).length;
+  const filteredPosts = scheduledOnly ? baseFiltered.filter((post) => scheduledMap[post.id]) : baseFiltered;
 
   if (loading && posts.length === 0) {
     return (
@@ -412,6 +457,7 @@ function AllPostsPageContent() {
                 publishedPubler: publerCounts,
               }}
             />
+            <ScheduledFilterRow active={scheduledOnly} count={scheduledCount} onClick={() => setScheduledOnly((v) => !v)} />
           </div>
 
           <div className="space-y-2">
@@ -487,6 +533,7 @@ function AllPostsPageContent() {
                 publishedPubler: publerCounts,
               }}
             />
+            <ScheduledFilterRow active={scheduledOnly} count={scheduledCount} onClick={() => setScheduledOnly((v) => !v)} />
           </div>
         )}
 
@@ -581,6 +628,7 @@ function AllPostsPageContent() {
                 onSelect={handleSelect}
                 hideActions
                 selectionMode={selectedPosts.size > 0}
+                scheduledAt={scheduledMap[post.id]}
               />
             </div>
           ))}

@@ -1,4 +1,4 @@
-import { Check, Circle, X, AlertCircle } from "lucide-react";
+import { Check, Circle, X, AlertCircle, CalendarClock } from "lucide-react";
 import { StatusCheck } from "@/types";
 import { cn } from "@/lib/utils";
 import {
@@ -97,6 +97,27 @@ export function StatusIcon({ status, label, size = "sm", showTooltip = true }: S
   );
 }
 
+/** Blue "Geplant" indicator shown in place of the published-status icon when a post is queued (MICM-30). */
+export function ScheduledIcon({ size = "sm", label = "Geplant" }: { size?: "sm" | "md" | "lg"; label?: string }) {
+  const sizeClasses = { sm: "w-5 h-5", md: "w-6 h-6", lg: "w-8 h-8" };
+  const iconSizes = { sm: "w-3 h-3", md: "w-4 h-4", lg: "w-5 h-5" };
+  const icon = (
+    <div className={cn("status-icon flex items-center justify-center bg-blue-500", sizeClasses[size])}>
+      <CalendarClock className={cn(iconSizes[size], "text-white")} />
+    </div>
+  );
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{icon}</TooltipTrigger>
+      <TooltipContent className="bg-popover">
+        <div className="text-sm">
+          <p className="font-medium">{label}</p>
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 interface StatusRowProps {
   status: {
     contentComplete: StatusCheck;
@@ -104,13 +125,20 @@ interface StatusRowProps {
     publishedPubler: StatusCheck;
   };
   size?: "sm" | "md" | "lg";
+  /** When true and the post isn't live yet, show a blue "Geplant" icon instead of the red published-X (MICM-30). */
+  scheduled?: boolean;
 }
 
-export function StatusRow({ status, size = "sm" }: StatusRowProps) {
+export function StatusRow({ status, size = "sm", scheduled = false }: StatusRowProps) {
+  const showScheduled = scheduled && status.published.color !== "green";
   return (
     <div className="flex items-center gap-1.5">
       <StatusIcon status={status.contentComplete} label="Content Complete" size={size} />
-      <StatusIcon status={status.published} label="Published" size={size} />
+      {showScheduled ? (
+        <ScheduledIcon size={size} />
+      ) : (
+        <StatusIcon status={status.published} label="Published" size={size} />
+      )}
       <StatusIcon status={status.publishedPubler} label="Published to Publer" size={size} />
     </div>
   );

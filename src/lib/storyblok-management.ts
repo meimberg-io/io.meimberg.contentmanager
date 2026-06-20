@@ -431,7 +431,7 @@ export async function deletePost(storyId: string) {
 /**
  * Publish a blog post in Storyblok
  */
-export async function publishPost(storyId: string) {
+export async function publishPost(storyId: string, opts?: { overrideDate?: string }) {
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
   }
@@ -456,6 +456,10 @@ export async function publishPost(storyId: string) {
   }
   content.headerpicture = ensureAssetField(content.headerpicture)
   content.teaserimage = ensureAssetField(content.teaserimage)
+
+  // The scheduler sets the publish date to the slot date so RSS/sorting use the real
+  // publication date instead of the (identical) creation date (MICM-30).
+  if (opts?.overrideDate) content.date = opts.overrideDate
 
   const response = await managementFetch(
     `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories/${storyId}`,
