@@ -517,9 +517,10 @@ export async function unpublishPost(storyId: string) {
 }
 
 /**
- * Get a story by ID (for merging updates)
+ * Get a story by ID (full content incl. body + publish flags).
+ * Used for merging updates and by the MCP read tools (MICM-23).
  */
-async function getPostById(storyId: string) {
+export async function getPostById(storyId: string) {
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
   }
@@ -544,16 +545,17 @@ async function getPostById(storyId: string) {
 }
 
 /**
- * Fetch a single blog post by slug via Management API (includes full content + publish status).
- * Two-step: resolve slug → ID via list endpoint, then fetch full story by ID.
- * The list endpoint does not return full nested content (e.g. body blocks).
+ * Fetch a single blog, article or linkedin post by slug via Management API
+ * (includes full content + publish status). Two-step: resolve slug → ID via the
+ * list endpoint, then fetch the full story by ID (the list endpoint returns no
+ * nested content). Tries the blog (`b/`), article (`a/`) and linkedin (`linkedin/`) folders.
  */
 export async function fetchSinglePostManagement(slug: string) {
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
   }
 
-  for (const prefix of ['b', 'a'] as const) {
+  for (const prefix of ['b', 'a', 'linkedin'] as const) {
     const response = await managementFetch(
       `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?by_slugs=${prefix}/${slug}`,
       {

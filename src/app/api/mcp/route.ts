@@ -3,14 +3,10 @@ import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
 import { createPost } from '@/lib/storyblok-management'
 import { validateMcpToken } from '@/lib/mcp-tokens'
+import { editorUrlForSlug, listPosts, getPost } from '@/lib/mcp-posts'
 
 // node:crypto (validateMcpToken) + the management-token write path → Node runtime.
 export const runtime = 'nodejs'
-
-/** Base URL for the editor deep link (falls back to a relative path). */
-function editorBase(): string {
-  return (process.env.APP_BASE_URL || process.env.NEXTAUTH_URL || '').replace(/\/+$/, '')
-}
 
 const handler = createMcpHandler(
   (server) => {
@@ -41,8 +37,7 @@ const handler = createMcpHandler(
         })
 
         const story = result.story
-        const base = editorBase()
-        const editorUrl = base ? `${base}/posts/${story.slug}` : `/posts/${story.slug}`
+        const editorUrl = editorUrlForSlug(story.slug)
         const payload = {
           id: String(story.id),
           slug: story.slug,
@@ -61,6 +56,84 @@ const handler = createMcpHandler(
                 JSON.stringify(payload, null, 2),
             },
           ],
+        }
+      }
+    )
+
+    server.registerTool(
+      'list_posts',
+      {
+        title: 'List Posts',
+        description:
+          'Listet alle Posts im meimberg.io Content Manager (Blog, Artikel und LinkedIn) — Drafts UND ' +
+          'Veröffentlichte — je mit Content-Complete-, Publish- und Geplant-Status, Herkunft (origin) und ' +
+          'editorUrl. Nützlich, um den Stand zu prüfen, Dubletten zu vermeiden und nach create_draft zu ' +
+          'verifizieren. Rein lesend.',
+        inputSchema: {
+          types: z
+            .array(z.enum(['blog', 'article', 'linkedin']))
+            .optional()
+            .describe('Optional: nur diese Content-Typen zurückgeben. Weglassen = alle.'),
+          intake_pending: z
+            .boolean()
+            .optional()
+            .describe('Optional: nur typlose MCP-Intakes (true) bzw. nur bereits getypte (false).'),
+          published: z
+            .boolean()
+            .optional()
+            .describe('Optional: nur veröffentlichte (true) bzw. nur unveröffentlichte (false) Posts.'),
+        },
+      },
+      async ({ types, intake_pending, published }) => {
+        const posts = await listPosts({ types, intake_pending, published })
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `${posts.length} Post(s).\n\n` + JSON.stringify(posts, null, 2),
+            },
+          ],
+        }
+      }
+    )
+
+    server.registerTool(
+      'get_post',
+      {
+        title: 'Get Post',
+        description:
+          'Liefert einen einzelnen Post (Blog, Artikel oder LinkedIn) mit allen Quell- und Content-Feldern, ' +
+          'dem vollen rohen Body-Block-Array und dem Status. Adressierung per numerischer id ODER slug ' +
+          '(mindestens eines erforderlich; id bevorzugt). Rein lesend.',
+        inputSchema: {
+          id: z
+            .string()
+            .optional()
+            .describe('Numerische Storyblok-Story-id (aus list_posts / create_draft).'),
+          slug: z.string().optional().describe('Story-Slug (Alternative zur id).'),
+        },
+      },
+      async ({ id, slug }) => {
+        if (!id && !slug) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: 'Fehler: Bitte id oder slug angeben.' }],
+          }
+        }
+        const post = await getPost({ id, slug })
+        if (!post) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text' as const,
+                text: `Kein Post gefunden für ${id ? `id=${id}` : `slug=${slug}`}.`,
+              },
+            ],
+          }
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(post, null, 2) }],
         }
       }
     )
