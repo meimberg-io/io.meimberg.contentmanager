@@ -6,6 +6,7 @@
     "spec": "Needs Specification",
     "ready": "Ready to Implement",
     "inProgress": "In Arbeit",
+    "implemented": "QS",
     "done": "Fertig"
   }
 }
