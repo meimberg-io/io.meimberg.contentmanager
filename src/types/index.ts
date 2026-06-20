@@ -38,7 +38,9 @@ export interface BlogPost {
   sourceRaw?: string;         // Original Plaud transcription (raw)
   sourceSummarized?: string;  // Plaud summary
   // Origin: how the post was created
-  origin?: 'import' | 'create';
+  origin?: 'import' | 'create' | 'mcp';
+  /** MICM-22: created via MCP as an untyped intake — content type not yet chosen. */
+  intakePending?: boolean;
   // AI settings (persisted per post)
   aiHint?: string;            // Additional AI hint
   imagePrompt?: string;       // DALL-E image prompt

@@ -371,6 +371,8 @@ export default function PostDetailPage() {
           cm_ai_hint: transientPromptHint || "",
           cm_image_prompt: imagePrompt || "",
           ...(headerpictureUpdate ? { headerpicture: headerpictureUpdate } : {}),
+          // MICM-22: saving an MCP intake draft resolves it — the user has now chosen/confirmed a type.
+          ...(post.intakePending ? { cm_intake_pending: false } : {}),
         }),
       });
 
@@ -1356,6 +1358,11 @@ export default function PostDetailPage() {
                   {storyKind.contentType !== originalStoryKind.contentType && (
                     <p className="text-xs text-amber-500/90">
                       Save to move to {storyKind.contentType === "article" ? "a/" : "b/"} and convert component in Storyblok.
+                    </p>
+                  )}
+                  {post?.intakePending && (
+                    <p className="text-xs text-amber-500/90">
+                      Intake aus dem Agenten — bitte Content-Typ wählen und speichern. Beim Speichern wird der Intake-Status aufgelöst.
                     </p>
                   )}
                 </div>

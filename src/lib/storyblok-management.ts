@@ -69,8 +69,10 @@ export interface BlogPostData {
   cm_source_summarized?: string
   cm_ai_hint?: string
   cm_image_prompt?: string
-  // Origin (import / create / manual)
-  cm_origin?: 'import' | 'create'
+  // Origin (import / create / mcp / manual)
+  cm_origin?: 'import' | 'create' | 'mcp'
+  /** MICM-22: untyped intake created via MCP; cleared in the editor once a type is chosen. */
+  cm_intake_pending?: boolean
   // Status fields
   cm_content_complete?: boolean
   cm_content_confirmed_at?: string

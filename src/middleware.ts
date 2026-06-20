@@ -5,8 +5,10 @@ import { getToken } from 'next-auth/jwt'
 // Routes that require authentication
 const protectedRoutes = ['/dashboard', '/posts', '/linkedin', '/import', '/settings', '/schedule', '/api/posts', '/api/linkedin', '/api/publishing', '/api/import', '/api/ai', '/api/schedule']
 
-// Public routes that don't require auth
-const publicRoutes = ['/login', '/api/auth']
+// Public routes that don't require auth.
+// `/api/mcp` authenticates via its own bearer token (MICM-31/22), not the Google session,
+// so it must bypass the NextAuth gate — analogous to the `/api/cron/tick` bearer path.
+const publicRoutes = ['/login', '/api/auth', '/api/mcp']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl

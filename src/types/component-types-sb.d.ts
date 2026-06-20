@@ -64,8 +64,6 @@ export interface Articleteaserlist {
 
 export interface Blog {
   pagetitle?: string;
-  cm_origin?: string;
-  name?: string;
   pageintro?: string;
   date: string;
   headerpicture?: StoryblokAsset;
@@ -117,6 +115,9 @@ export interface Blog {
   cm_publer_post_ids?: string;
   cm_ai_hint?: string;
   cm_image_prompt?: string;
+  cm_intake_pending?: boolean;
+  name?: string;
+  cm_origin?: string;
   component: "blog";
   _uid: string;
   [k: string]: unknown;

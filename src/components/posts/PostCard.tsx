@@ -7,7 +7,7 @@ import { StatusRow } from "@/components/ui/StatusIcon";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Trash2, Upload, FileEdit } from "lucide-react";
+import { Pencil, Trash2, Upload, FileEdit, Bot } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
@@ -22,6 +22,22 @@ function contentTypeBadgeLabel(post: BlogPost) {
   return post.blogBodyVariant === "short" ? "Blog (Short)" : "Blog (Long)";
 }
 
+/** Type badge — or, for an untyped MCP intake (MICM-22), an "Intake — Typ wählen" hint instead. */
+function TypeOrIntakeBadge({ post }: { post: BlogPost }) {
+  if (post.intakePending) {
+    return (
+      <Badge variant="outline" className="text-[10px] shrink-0 border-amber-500/40 text-amber-500">
+        Intake — Typ wählen
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-[10px] shrink-0">
+      {contentTypeBadgeLabel(post)}
+    </Badge>
+  );
+}
+
 interface PostCardProps {
   post: BlogPost;
   isSelected?: boolean;
@@ -33,7 +49,21 @@ interface PostCardProps {
   scheduledAt?: string;
 }
 
-function OriginIcon({ origin }: { origin?: 'import' | 'create' }) {
+function OriginIcon({ origin }: { origin?: 'import' | 'create' | 'mcp' }) {
+  if (origin === 'mcp') {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex text-muted-foreground" aria-label="Via Agent (MCP)">
+              <Bot className="h-3.5 w-3.5" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Via Agent (MCP)</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
   if (origin === 'import') {
     return (
       <TooltipProvider delayDuration={200}>
@@ -103,9 +133,7 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium break-words">{post.pagetitle || post.slug}</p>
-            <Badge variant="outline" className="text-[10px] shrink-0">
-              {contentTypeBadgeLabel(post)}
-            </Badge>
+            <TypeOrIntakeBadge post={post} />
           </div>
           <p className="text-sm text-muted-foreground break-words whitespace-normal">{post.abstract}</p>
         </div>
@@ -177,9 +205,7 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-medium truncate flex-1 min-w-0">{post.pagetitle || post.slug}</h3>
-          <Badge variant="outline" className="text-[10px] shrink-0">
-            {contentTypeBadgeLabel(post)}
-          </Badge>
+          <TypeOrIntakeBadge post={post} />
         </div>
         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{post.abstract}</p>
 
