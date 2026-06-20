@@ -21,11 +21,24 @@ import {
   StickyNote,
   RotateCcw,
   CalendarClock,
+  CalendarDays,
   Plus,
   X,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import type { Schedule, ScheduleSlot } from "@/types";
 
 // Must match DEFAULT_PROMPTS in settings-storage.ts
 const DEFAULT_PROMPTS: Record<string, string> = {
@@ -134,6 +147,50 @@ const PROMPT_FIELDS: { key: string; label: string; description: string }[] = [
 // Must match DEFAULT_PUBLER_LABELS in settings-storage.ts (MICM-13).
 const DEFAULT_PUBLER_LABELS = ["Standard", "Series 1", "Series 2", "Series 3"];
 
+// ── Scheduler (MICM-14) ──────────────────────────────────────────────
+const SCHEDULE_TIMEZONE = "Europe/Berlin";
+
+// weekday uses JS getDay(): 0 = Sonntag … 6 = Samstag. Displayed Monday-first.
+const WEEKDAYS: { value: number; label: string }[] = [
+  { value: 1, label: "Montag" },
+  { value: 2, label: "Dienstag" },
+  { value: 3, label: "Mittwoch" },
+  { value: 4, label: "Donnerstag" },
+  { value: 5, label: "Freitag" },
+  { value: 6, label: "Samstag" },
+  { value: 0, label: "Sonntag" },
+];
+
+const timeToMinutes = (t: string): number => {
+  const [h, m] = t.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+// Sort key: Monday-first weekday, then time-of-day.
+const slotSortKey = (s: ScheduleSlot): number => ((s.weekday + 6) % 7) * 10000 + timeToMinutes(s.time);
+const weekdayLabel = (w: number): string => WEEKDAYS.find((d) => d.value === w)?.label ?? String(w);
+
+/** Returns a human-readable error message if the schedules are invalid, else null. */
+function validateSchedules(list: Schedule[]): string | null {
+  const names = new Set<string>();
+  for (const s of list) {
+    const name = s.name.trim();
+    if (!name) return "Jeder Schedule braucht einen Namen.";
+    const nameKey = name.toLowerCase();
+    if (names.has(nameKey)) return `Doppelter Schedule-Name: „${name}".`;
+    names.add(nameKey);
+    const slotKeys = new Set<string>();
+    for (const slot of s.slots) {
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(slot.time)) {
+        return `Ungültige Uhrzeit „${slot.time}" in „${name}" (Format HH:MM).`;
+      }
+      const slotKey = `${slot.weekday}-${slot.time}`;
+      if (slotKeys.has(slotKey)) return `Doppelter Slot in „${name}": ${weekdayLabel(slot.weekday)} ${slot.time}.`;
+      slotKeys.add(slotKey);
+    }
+  }
+  return null;
+}
+
 interface AIModel {
   id: string;
   name: string;
@@ -173,6 +230,10 @@ export default function SettingsPage() {
   // Publer slot labels (MICM-13)
   const [publerLabels, setPublerLabels] = useState<string[]>(DEFAULT_PUBLER_LABELS);
 
+  // Publishing schedules (MICM-14)
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
+
   // Load settings and models from API on mount
   useEffect(() => {
     async function loadData() {
@@ -193,6 +254,7 @@ export default function SettingsPage() {
               ? settings.publerLabels
               : DEFAULT_PUBLER_LABELS
           );
+          setSchedules(Array.isArray(settings.schedules) ? settings.schedules : []);
           
           const savedPrompts = settings.aiPrompts || {};
           const merged: Record<string, string> = {};
@@ -226,6 +288,11 @@ export default function SettingsPage() {
   }, []);
 
   const handleSave = async () => {
+    const scheduleError = validateSchedules(schedules);
+    if (scheduleError) {
+      toast({ variant: 'destructive', title: 'Schedule ungültig', description: scheduleError });
+      return;
+    }
     setIsSaving(true);
     try {
       const response = await fetch('/api/settings', {
@@ -237,6 +304,11 @@ export default function SettingsPage() {
             aiPrompts: prompts,
             notes,
             publerLabels: publerLabels.map((l) => l.trim()).filter(Boolean),
+            schedules: schedules.map((s) => ({
+              ...s,
+              name: s.name.trim(),
+              slots: [...s.slots].sort((a, b) => slotSortKey(a) - slotSortKey(b)),
+            })),
           }
         })
       });
@@ -284,6 +356,27 @@ export default function SettingsPage() {
     setPublerLabels(prev => [...prev, ""]);
   };
 
+  // ── Schedules (MICM-14) ──
+  const addSchedule = () =>
+    setSchedules((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: `Schedule ${prev.length + 1}`, timezone: SCHEDULE_TIMEZONE, slots: [], queue: [], lastFiredAt: null },
+    ]);
+  const renameSchedule = (id: string, name: string) =>
+    setSchedules((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+  const confirmDeleteSchedule = () => {
+    setSchedules((prev) => prev.filter((s) => s.id !== scheduleToDelete));
+    setScheduleToDelete(null);
+  };
+  const addSlot = (id: string) =>
+    setSchedules((prev) => prev.map((s) => (s.id === id ? { ...s, slots: [...s.slots, { weekday: 1, time: "10:00" }] } : s)));
+  const removeSlot = (id: string, idx: number) =>
+    setSchedules((prev) => prev.map((s) => (s.id === id ? { ...s, slots: s.slots.filter((_, i) => i !== idx) } : s)));
+  const setSlot = (id: string, idx: number, patch: Partial<ScheduleSlot>) =>
+    setSchedules((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, slots: s.slots.map((sl, i) => (i === idx ? { ...sl, ...patch } : sl)) } : s))
+    );
+
   const effectiveModel = selectedModel || defaultModel;
   const effectiveModelInfo = allModels.find(m => m.id === effectiveModel);
   const isModelAvailable = availableModels.some(m => m.id === effectiveModel);
@@ -314,7 +407,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="prompts" className="space-y-6">
-        <TabsList className="bg-muted/50 grid w-full grid-cols-4">
+        <TabsList className="bg-muted/50 grid w-full grid-cols-5">
           <TabsTrigger value="prompts" className="gap-2">
             <Sparkles className="h-4 w-4 text-blue-400" />
             Prompts
@@ -326,6 +419,10 @@ export default function SettingsPage() {
           <TabsTrigger value="publer" className="gap-2">
             <CalendarClock className="h-4 w-4 text-[#0a66c2]" />
             Publer
+          </TabsTrigger>
+          <TabsTrigger value="schedules" className="gap-2">
+            <CalendarDays className="h-4 w-4 text-blue-400" />
+            Schedules
           </TabsTrigger>
           <TabsTrigger value="notes" className="gap-2">
             <StickyNote className="h-4 w-4" />
@@ -504,6 +601,113 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
 
+        {/* Schedules Tab */}
+        <TabsContent value="schedules" className="space-y-6 animate-fade-in">
+          <div className="glass-card p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-xl font-semibold">Veröffentlichungs-Schedules</h2>
+              <Button variant="outline" size="sm" className="gap-2" onClick={addSchedule}>
+                <Plus className="h-3.5 w-3.5" />
+                Schedule
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Ein Schedule ist eine Liste wöchentlich wiederkehrender Zeit-Slots (Zeitzone {SCHEDULE_TIMEZONE}).
+              Eingeplante Beiträge werden der Reihe nach in die nächsten freien Slots veröffentlicht.
+            </p>
+
+            {schedules.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">Noch kein Schedule angelegt.</p>
+            ) : (
+              <div className="space-y-4">
+                {schedules.map((s) => {
+                  const sortedSlots = [...s.slots].sort((a, b) => slotSortKey(a) - slotSortKey(b));
+                  return (
+                    <div key={s.id} className="rounded-lg border border-border/60 bg-secondary/30 p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={s.name}
+                          onChange={(e) => renameSchedule(s.id, e.target.value)}
+                          placeholder="Schedule-Name"
+                          className="bg-secondary/50 font-medium"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 shrink-0 text-muted-foreground/60 hover:bg-red-600 hover:text-white cursor-pointer"
+                          onClick={() => setScheduleToDelete(s.id)}
+                          title="Schedule löschen"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {s.slots.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">Keine Slots — füge wöchentliche Zeitpunkte hinzu.</p>
+                        ) : (
+                          s.slots.map((slot, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <Select value={String(slot.weekday)} onValueChange={(v) => setSlot(s.id, i, { weekday: Number(v) })}>
+                                <SelectTrigger className="bg-secondary/50 w-40">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-popover">
+                                  {WEEKDAYS.map((d) => (
+                                    <SelectItem key={d.value} value={String(d.value)}>
+                                      {d.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="time"
+                                value={slot.time}
+                                onChange={(e) => setSlot(s.id, i, { time: e.target.value })}
+                                className="bg-secondary/50 w-32"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 shrink-0 text-muted-foreground/60 hover:bg-red-600 hover:text-white cursor-pointer"
+                                onClick={() => removeSlot(s.id, i)}
+                                title="Slot entfernen"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => addSlot(s.id)}>
+                          <Plus className="h-3.5 w-3.5" />
+                          Slot
+                        </Button>
+                      </div>
+
+                      {sortedSlots.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {sortedSlots.map((slot, i) => (
+                            <Badge key={i} variant="outline" className="text-xs text-muted-foreground">
+                              {weekdayLabel(slot.weekday)} {slot.time}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end">
+            <Button className="gap-2" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+              {isSaving ? 'Saved!' : 'Save Settings'}
+            </Button>
+          </div>
+        </TabsContent>
+
         {/* Notes Tab */}
         <TabsContent value="notes" className="space-y-6 animate-fade-in">
           <div className="glass-card p-6 space-y-4">
@@ -530,6 +734,33 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog
+        open={scheduleToDelete !== null}
+        onOpenChange={(open) => { if (!open) setScheduleToDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Schedule löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const s = schedules.find((x) => x.id === scheduleToDelete);
+                const n = s?.queue.length ?? 0;
+                if (n > 0) {
+                  return `„${s?.name}" enthält ${n} eingeplante${n === 1 ? "n" : ""} Beitrag${n === 1 ? "" : "e"}. Beim Löschen werden diese nur aus dem Plan genommen und bleiben unveröffentlichte Entwürfe.`;
+                }
+                return `„${s?.name ?? ""}" wird gelöscht. Das betrifft nur den Schedule, keine Beiträge. Wirksam mit „Save Settings".`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteSchedule} className="bg-red-600 hover:bg-red-700">
+              Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

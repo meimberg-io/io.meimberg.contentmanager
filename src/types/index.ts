@@ -149,3 +149,40 @@ export interface ActivityItem {
   timestamp: string;
   status: 'success' | 'warning' | 'error' | 'info';
 }
+
+// ── Scheduler (MICM-14) ──────────────────────────────────────────────────────
+/** What kind of story a queue entry points at. */
+export type ScheduleEntryType = 'blog' | 'article' | 'linkedin'
+
+/**
+ * A recurring weekly publishing slot.
+ * `weekday` follows the JS `Date.getDay()` convention: 0 = Sonntag … 6 = Samstag.
+ * `time` is "HH:MM" (24h), interpreted in the schedule's `timezone`.
+ */
+export interface ScheduleSlot {
+  weekday: number;
+  time: string;
+}
+
+/** One queued item waiting to be published into the schedule's next free slot. */
+export interface ScheduleQueueEntry {
+  storyUuid: string;
+  typ: ScheduleEntryType;
+}
+
+/**
+ * A publishing schedule: a set of recurring weekly slots plus an ordered queue
+ * of posts that drain into those slots (MICM-14). Stored in the app config
+ * (`contentmanager_config` → settings.schedules), not in a Storyblok component.
+ */
+export interface Schedule {
+  id: string;
+  name: string;
+  /** IANA timezone; currently fixed to "Europe/Berlin" (no UI selection, MICM-15). */
+  timezone: string;
+  slots: ScheduleSlot[];
+  /** Ordered publishing queue; head goes out first. Empty until MICM-18. */
+  queue: ScheduleQueueEntry[];
+  /** ISO timestamp of the most recently processed slot occurrence; null = never fired. Set by the engine (MICM-17). */
+  lastFiredAt: string | null;
+}

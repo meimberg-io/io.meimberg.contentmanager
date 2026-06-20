@@ -4,6 +4,7 @@
  */
 
 import { getSystemConfig, updateSystemConfig } from './system-config'
+import type { Schedule } from '@/types'
 
 export interface AiPrompts {
   pagetitle?: string
@@ -39,7 +40,15 @@ export interface Settings {
    * entry = default. Empty/undefined → DEFAULT_PUBLER_LABELS.
    */
   publerLabels?: string[]
+  /**
+   * Publishing schedules (MICM-14). Each holds recurring weekly slots plus an
+   * ordered queue of posts that the scheduler drains into the next free slots.
+   */
+  schedules?: Schedule[]
 }
+
+/** Fixed timezone for schedule slots (MICM-15 — no per-schedule UI selection yet). */
+export const SCHEDULE_DEFAULT_TIMEZONE = 'Europe/Berlin'
 
 /** Default Publer label set; must match the labels configured in Publer's posting schedule (MICM-13). */
 export const DEFAULT_PUBLER_LABELS = ['Standard', 'Series 1', 'Series 2', 'Series 3']
