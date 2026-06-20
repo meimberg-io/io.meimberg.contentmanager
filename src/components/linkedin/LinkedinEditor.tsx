@@ -63,6 +63,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { ScheduleAssign } from "@/components/scheduler/ScheduleAssign";
 import { cn } from "@/lib/utils";
 
 /** Parent blog link preview (resolved server-side, MICM-11). */
@@ -1031,6 +1032,15 @@ export function LinkedinEditor({ post, parent, onChanged, onDeleted, compact = f
           {imagePanel}
           {textEditor}
           {actions}
+          {/* Scheduled (MICM-18) — standalone LinkedIn posts can be planned into a schedule */}
+          <div className="border-t border-border/40 pt-3">
+            <ScheduleAssign
+              storyUuid={post.id}
+              typ="linkedin"
+              complete={post.status.contentComplete.completed}
+              onChanged={onChanged}
+            />
+          </div>
         </div>
         <aside className="space-y-4 lg:sticky lg:top-4">
           {aiSettingsPanel}

@@ -76,6 +76,7 @@ function deriveSlug(title: string): string {
 
 import { getRichtextEditor } from "@/components/blocks/RichtextBlock";
 import { BlogLinkedinSection } from "@/components/linkedin/BlogLinkedinSection";
+import { ScheduleAssign } from "@/components/scheduler/ScheduleAssign";
 
 // Dynamic import BodyEditor to avoid SSR issues with dnd-kit/tiptap
 const BodyEditor = dynamic(
@@ -1241,6 +1242,16 @@ export default function PostDetailPage() {
                 </Button>
               )
             )}
+          </div>
+
+          {/* Scheduled (MICM-18) — assign to a publishing schedule instead of publishing now */}
+          <div className="border-t border-border/40 pt-3">
+            <ScheduleAssign
+              storyUuid={post.id}
+              typ={post.contentType}
+              complete={post.status.contentComplete.completed}
+              onChanged={loadPost}
+            />
           </div>
 
           {/* Published — green = publish (positive), red = unpublish (destructive) */}
