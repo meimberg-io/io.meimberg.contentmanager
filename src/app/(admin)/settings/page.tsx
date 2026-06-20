@@ -26,8 +26,10 @@ import {
   X,
   Trash2,
   Play,
+  KeyRound,
+  Copy,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -211,6 +213,14 @@ const PROVIDER_COLORS: Record<string, string> = {
   google: 'bg-blue-500/20 text-blue-400 border-blue-500/30'
 };
 
+/** MCP token as returned by GET /api/settings/tokens (masked, no hash). MICM-31. */
+interface McpTokenView {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+}
+
 export default function SettingsPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   
@@ -235,6 +245,25 @@ export default function SettingsPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
   const [runningTick, setRunningTick] = useState(false);
+
+  // MCP bearer tokens (MICM-31)
+  const [mcpTokens, setMcpTokens] = useState<McpTokenView[]>([]);
+  const [newTokenName, setNewTokenName] = useState("");
+  const [creatingToken, setCreatingToken] = useState(false);
+  const [createdToken, setCreatedToken] = useState<{ name: string; plaintext: string } | null>(null);
+  const [tokenToRevoke, setTokenToRevoke] = useState<string | null>(null);
+
+  const loadTokens = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/tokens");
+      if (res.ok) {
+        const data = await res.json();
+        setMcpTokens(Array.isArray(data.tokens) ? data.tokens : []);
+      }
+    } catch (error) {
+      console.error("Failed to load MCP tokens:", error);
+    }
+  }, []);
 
   // Load settings and models from API on mount
   useEffect(() => {
@@ -287,7 +316,8 @@ export default function SettingsPage() {
     }
     
     loadData();
-  }, []);
+    loadTokens();
+  }, [loadTokens]);
 
   const handleSave = async () => {
     const scheduleError = validateSchedules(schedules);
@@ -396,6 +426,58 @@ export default function SettingsPage() {
     }
   };
 
+  // ── MCP tokens (MICM-31) ──
+  const handleCreateToken = async () => {
+    const name = newTokenName.trim();
+    if (!name) {
+      toast({ variant: "destructive", title: "Name fehlt", description: "Bitte einen Namen für den Token eingeben." });
+      return;
+    }
+    setCreatingToken(true);
+    try {
+      const res = await fetch("/api/settings/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Token konnte nicht erstellt werden");
+      setCreatedToken({ name, plaintext: data.plaintext });
+      setNewTokenName("");
+      await loadTokens();
+      toast({ title: "Token erstellt", description: "Kopiere ihn jetzt — er wird nur einmal angezeigt." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Fehler", description: error instanceof Error ? error.message : "Token konnte nicht erstellt werden" });
+    } finally {
+      setCreatingToken(false);
+    }
+  };
+
+  const confirmRevokeToken = async () => {
+    const id = tokenToRevoke;
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/settings/tokens/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Token konnte nicht widerrufen werden");
+      await loadTokens();
+      toast({ title: "Token widerrufen", description: "Der Token authentifiziert nicht mehr." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Fehler", description: error instanceof Error ? error.message : "Token konnte nicht widerrufen werden" });
+    } finally {
+      setTokenToRevoke(null);
+    }
+  };
+
+  const copyToken = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast({ title: "Kopiert", description: "Token in die Zwischenablage kopiert." });
+    } catch {
+      toast({ variant: "destructive", title: "Kopieren fehlgeschlagen", description: "Bitte manuell markieren und kopieren." });
+    }
+  };
+
   const effectiveModel = selectedModel || defaultModel;
   const effectiveModelInfo = allModels.find(m => m.id === effectiveModel);
   const isModelAvailable = availableModels.some(m => m.id === effectiveModel);
@@ -426,7 +508,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="prompts" className="space-y-6">
-        <TabsList className="bg-muted/50 grid w-full grid-cols-5">
+        <TabsList className="bg-muted/50 grid w-full grid-cols-6">
           <TabsTrigger value="prompts" className="gap-2">
             <Sparkles className="h-4 w-4 text-blue-400" />
             Prompts
@@ -446,6 +528,10 @@ export default function SettingsPage() {
           <TabsTrigger value="notes" className="gap-2">
             <StickyNote className="h-4 w-4" />
             Notes
+          </TabsTrigger>
+          <TabsTrigger value="mcp" className="gap-2">
+            <KeyRound className="h-4 w-4 text-emerald-400" />
+            MCP
           </TabsTrigger>
         </TabsList>
 
@@ -758,6 +844,91 @@ export default function SettingsPage() {
             </Button>
           </div>
         </TabsContent>
+
+        {/* MCP Tab (MICM-31) */}
+        <TabsContent value="mcp" className="space-y-6 animate-fade-in">
+          <div className="glass-card p-6 space-y-4">
+            <h2 className="font-display text-xl font-semibold">MCP / API-Zugriff</h2>
+            <p className="text-sm text-muted-foreground">
+              Bearer-Tokens für den MCP-Server. Ein Agent (z. B. Claude Code) authentifiziert sich damit
+              gegen den MCP-Endpoint. Tokens werden nur <strong>gehasht</strong> gespeichert und beim Anlegen{" "}
+              <strong>einmalig</strong> im Klartext angezeigt. Widerrufen entfernt einen Token dauerhaft
+              (wirkt innerhalb von ca. 30&nbsp;Sekunden).
+            </p>
+
+            {createdToken && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
+                <p className="text-sm font-medium text-amber-300">
+                  Neuer Token „{createdToken.name}“ — wird nur jetzt angezeigt:
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 break-all rounded bg-secondary/60 px-3 py-2 font-mono text-sm">
+                    {createdToken.plaintext}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 cursor-pointer"
+                    onClick={() => copyToken(createdToken.plaintext)}
+                    title="Kopieren"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="ghost" size="sm" className="cursor-pointer" onClick={() => setCreatedToken(null)}>
+                    Verstanden
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Input
+                value={newTokenName}
+                onChange={(e) => setNewTokenName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateToken(); } }}
+                placeholder="Token-Name, z. B. Claude Code"
+                className="bg-secondary/50"
+              />
+              <Button
+                className="gap-2 shrink-0 cursor-pointer"
+                onClick={handleCreateToken}
+                disabled={creatingToken || !newTokenName.trim()}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {creatingToken ? "Erstelle…" : "Token anlegen"}
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {mcpTokens.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">Noch kein Token angelegt.</p>
+              ) : (
+                mcpTokens.map((t) => (
+                  <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-secondary/30 p-3">
+                    <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{t.name}</p>
+                      <p className="truncate font-mono text-xs text-muted-foreground">
+                        {t.prefix} · angelegt {new Date(t.createdAt).toLocaleDateString("de-DE")}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 text-muted-foreground/60 hover:bg-red-600 hover:text-white cursor-pointer"
+                      onClick={() => setTokenToRevoke(t.id)}
+                      title="Token widerrufen"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
 
       <AlertDialog
@@ -782,6 +953,29 @@ export default function SettingsPage() {
             <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteSchedule} className="bg-red-600 hover:bg-red-700">
               Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={tokenToRevoke !== null}
+        onOpenChange={(open) => { if (!open) setTokenToRevoke(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Token widerrufen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const t = mcpTokens.find((x) => x.id === tokenToRevoke);
+                return `„${t?.name ?? ""}" wird dauerhaft entfernt und authentifiziert danach nicht mehr. Ein Agent, der diesen Token nutzt, verliert den Zugriff (innerhalb von ca. 30 Sekunden).`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRevokeToken} className="bg-red-600 hover:bg-red-700">
+              Widerrufen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

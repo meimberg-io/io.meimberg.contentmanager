@@ -30,6 +30,22 @@ export interface AiPrompts {
   tags?: string
 }
 
+/**
+ * A bearer token for the MCP server (MICM-31). Stored HASHED — the plaintext is
+ * shown to the user exactly once at creation and never persisted. `prefix` is a
+ * masked, non-reconstructable hint for recognising the token in the list.
+ */
+export interface McpToken {
+  id: string
+  name: string
+  /** SHA-256 hex of the full plaintext token. */
+  tokenHash: string
+  /** Masked display hint, e.g. `micm_ab12cd…`. */
+  prefix: string
+  /** ISO 8601 creation timestamp. */
+  createdAt: string
+}
+
 export interface Settings {
   aiModel?: string
   aiPrompts?: AiPrompts
@@ -45,6 +61,11 @@ export interface Settings {
    * ordered queue of posts that the scheduler drains into the next free slots.
    */
   schedules?: Schedule[]
+  /**
+   * MCP bearer tokens (MICM-31). Managed in Settings → "MCP", validated by the
+   * MCP server (MICM-22). Stored hashed; revoke = hard delete from this array.
+   */
+  mcpTokens?: McpToken[]
 }
 
 /** Fixed timezone for schedule slots (MICM-15 — no per-schedule UI selection yet). */
