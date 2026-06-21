@@ -44,7 +44,7 @@ export default function LoginPage() {
               />
               <div>
                 <h1 className="font-display text-3xl font-bold tracking-tight">
-                  Blogmanager
+                  SmartEditor
                 </h1>
                 <p className="text-muted-foreground mt-2">
                   meimberg.io
