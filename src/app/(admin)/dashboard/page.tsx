@@ -3,7 +3,7 @@
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ActivityList } from "@/components/dashboard/ActivityList";
 import { Button } from "@/components/ui/button";
-import { FileText, CheckCircle, Globe, Smartphone, Upload, FolderOpen, PlusCircle } from "lucide-react";
+import { FileText, CheckCircle, Globe, Linkedin, Upload, FolderOpen, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
@@ -61,7 +61,7 @@ export default function DashboardPage() {
   }, []);
 
   function getLatestAction(post: any) {
-    if (post.status.publishedPubler.completed) return 'Published to social media';
+    if (post.status.publishedPubler.completed) return 'Published to LinkedIn';
     if (post.status.published.completed) return 'Published to website';
     if (post.status.contentComplete.completed) return 'Content completed';
     if (post.status.contentComplete.color === 'yellow') return 'Content in progress';
@@ -119,9 +119,9 @@ export default function DashboardPage() {
           style={{ animationDelay: "100ms" }}
         />
         <StatCard
-          title="Social Media Posts"
+          title="LinkedIn"
           value={stats.socialMediaPosts}
-          icon={Smartphone}
+          icon={Linkedin}
           variant="purple"
           className="animate-slide-up"
           style={{ animationDelay: "150ms" }}
