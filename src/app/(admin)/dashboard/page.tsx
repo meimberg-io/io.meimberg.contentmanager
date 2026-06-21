@@ -8,6 +8,7 @@ import { LinkedInIcon } from "@/components/icons/LinkedInIcon";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
+import { buildLinkedinStatusByBlog } from "@/lib/linkedin-status";
 import { ymdInZone } from "@/lib/schedule-time";
 
 export default function DashboardPage() {
@@ -15,7 +16,7 @@ export default function DashboardPage() {
     totalPosts: 0,
     contentComplete: 0,
     published: 0,
-    socialMediaPosts: 0
+    linkedinPosts: 0
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,9 +24,10 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [response, scheduleRes] = await Promise.all([
+        const [response, scheduleRes, linkedinRes] = await Promise.all([
           fetch('/api/posts?perPage=100'),
           fetch('/api/schedule').catch(() => null),
+          fetch('/api/linkedin').catch(() => null),
         ]);
         const data = await response.json();
 
@@ -44,12 +46,20 @@ export default function DashboardPage() {
             }
           }
         }
-        
+
+        // Join: blog UUID -> status of its attached LinkedIn post(s), same definition as
+        // the posts list. "LinkedIn" counts blogs whose attached post is published (green).
+        let linkedinByBlog: Record<string, { color: string }> = {};
+        if (linkedinRes && linkedinRes.ok) {
+          const li = await linkedinRes.json();
+          linkedinByBlog = buildLinkedinStatusByBlog(li.posts || [], (uuid) => !!scheduledMap[uuid]);
+        }
+
         setStats({
           totalPosts: stories.length,
           contentComplete: transformedPosts.filter((p: any) => p.status.contentComplete.completed).length,
           published: transformedPosts.filter((p: any) => p.status.published.completed).length,
-          socialMediaPosts: transformedPosts.filter((p: any) => p.status.publishedPubler.completed).length
+          linkedinPosts: transformedPosts.filter((p: any) => linkedinByBlog[p.id]?.color === 'green').length
         });
 
         const sortedPosts = [...transformedPosts].sort((a: any, b: any) => {
@@ -62,7 +72,7 @@ export default function DashboardPage() {
           id: post.id,
           postId: post.slug,
           postTitle: post.pagetitle || post.slug || 'Untitled',
-          action: getLatestAction(post, scheduledMap[post.id]),
+          action: getLatestAction(post, scheduledMap[post.id], linkedinByBlog[post.id]?.color === 'green'),
           timestamp: post.lastModified || post.createdAt,
           status: getActivityStatus(post, scheduledMap[post.id])
         }));
@@ -78,8 +88,8 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  function getLatestAction(post: any, scheduledAt?: string) {
-    if (post.status.publishedPubler.completed) return 'Published to LinkedIn';
+  function getLatestAction(post: any, scheduledAt?: string, linkedinPublished?: boolean) {
+    if (linkedinPublished) return 'Published to LinkedIn';
     if (post.status.published.completed) return 'Published to website';
     if (scheduledAt) return `Scheduled for ${scheduledAt}`;
     if (post.status.contentComplete.completed) return 'Content completed';
@@ -140,7 +150,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="LinkedIn"
-          value={stats.socialMediaPosts}
+          value={stats.linkedinPosts}
           icon={LinkedInIcon}
           variant="purple"
           className="animate-slide-up"

@@ -45,11 +45,11 @@ export interface BlogPost {
   // AI settings (persisted per post)
   aiHint?: string;            // Additional AI hint
   imagePrompt?: string;       // DALL-E image prompt
-  // Status
+  // Status. The LinkedIn dot is NOT here — it's join-derived from the attached
+  // linkedin_post (see buildLinkedinStatusByBlog), not intrinsic to the blog story.
   status: {
     contentComplete: StatusCheck;
     published: StatusCheck;
-    publishedPubler: StatusCheck;
   };
   // Publer fields (kept)
   publerPostIds?: string[];

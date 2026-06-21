@@ -40,6 +40,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
+import { buildLinkedinStatusByBlog } from "@/lib/linkedin-status";
 import { StatusCheck } from "@/types";
 import { ymdInZone } from "@/lib/schedule-time";
 import { toast } from "@/hooks/use-toast";
@@ -310,31 +311,10 @@ function AllPostsPageContent() {
           setScheduledMap(map);
         }
 
-        // Join: blog UUID -> status of its attached LinkedIn post(s). The dot reflects
-        // the *least-done* attachment (yellow > blue > green) so a blog stays in the
-        // worklist until every attached LinkedIn post is published. No attachment = gray.
+        // Join: blog UUID -> status of its attached LinkedIn post(s) (gray/yellow/blue/green).
         if (linkedinRes && linkedinRes.ok) {
           const li = await linkedinRes.json();
-          const byParent: Record<string, StatusCheck['color'][]> = {};
-          for (const lp of li.posts || []) {
-            if (!lp.blogParentUuid) continue;
-            const color: StatusCheck['color'] = lp.status?.publishedLinkedIn?.completed
-              ? 'green'
-              : map[lp.id]
-                ? 'blue'
-                : 'yellow';
-            (byParent[lp.blogParentUuid] ||= []).push(color);
-          }
-          const liMap: Record<string, StatusCheck> = {};
-          for (const [parentUuid, colors] of Object.entries(byParent)) {
-            const color: StatusCheck['color'] = colors.includes('yellow')
-              ? 'yellow'
-              : colors.includes('blue')
-                ? 'blue'
-                : 'green';
-            liMap[parentUuid] = { completed: color === 'green', color };
-          }
-          setLinkedinStatusMap(liMap);
+          setLinkedinStatusMap(buildLinkedinStatusByBlog(li.posts || [], (uuid) => !!map[uuid]));
         }
       } catch (error) {
         console.error('Failed to load data:', error);
