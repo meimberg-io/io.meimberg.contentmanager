@@ -35,6 +35,8 @@ export function StatusIcon({ status, label, size = "sm", showTooltip = true }: S
         return <Check className={cn(iconClass, "text-white")} />;
       case "yellow":
         return <AlertCircle className={cn(iconClass, "text-black")} />;
+      case "blue":
+        return <CalendarClock className={cn(iconClass, "text-white")} />;
       case "red":
         return <X className={cn(iconClass, "text-white")} />;
       default:
@@ -48,6 +50,8 @@ export function StatusIcon({ status, label, size = "sm", showTooltip = true }: S
         return "status-green";
       case "yellow":
         return "status-yellow";
+      case "blue":
+        return "status-blue";
       case "red":
         return "status-red";
       default:
@@ -122,14 +126,19 @@ interface StatusRowProps {
   status: {
     contentComplete: StatusCheck;
     published: StatusCheck;
-    publishedPubler: StatusCheck;
   };
+  /**
+   * Status of the LinkedIn post attached to this blog (join-derived, not intrinsic
+   * to the blog story): gray = none attached, yellow = in progress, blue = scheduled,
+   * green = published to LinkedIn.
+   */
+  linkedin: StatusCheck;
   size?: "sm" | "md" | "lg";
   /** When true and the post isn't live yet, show a blue "Geplant" icon instead of the red published-X (MICM-30). */
   scheduled?: boolean;
 }
 
-export function StatusRow({ status, size = "sm", scheduled = false }: StatusRowProps) {
+export function StatusRow({ status, linkedin, size = "sm", scheduled = false }: StatusRowProps) {
   const showScheduled = scheduled && status.published.color !== "green";
   return (
     <div className="flex items-center gap-1.5">
@@ -139,7 +148,7 @@ export function StatusRow({ status, size = "sm", scheduled = false }: StatusRowP
       ) : (
         <StatusIcon status={status.published} label="Published" size={size} />
       )}
-      <StatusIcon status={status.publishedPubler} label="Published to Publer" size={size} />
+      <StatusIcon status={linkedin} label="LinkedIn" size={size} />
     </div>
   );
 }

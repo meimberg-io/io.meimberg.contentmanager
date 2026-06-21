@@ -125,7 +125,8 @@ function toEntry(story: any, scheduledMap: Map<string, string | null>): PostList
       origin: t.origin ?? null,
       contentComplete: {
         confirmed: t.status.contentComplete.completed,
-        color: t.status.contentComplete.color,
+        // 'blue' (scheduled) only ever applies to the LinkedIn dot, never to content-complete.
+        color: t.status.contentComplete.color as 'green' | 'yellow' | 'red' | 'gray',
       },
       published: {
         isPublished: t.status.publishedLinkedIn.completed,
@@ -152,7 +153,8 @@ function toEntry(story: any, scheduledMap: Map<string, string | null>): PostList
     origin: t.origin ?? null,
     contentComplete: {
       confirmed: t.status.contentComplete.completed,
-      color: t.status.contentComplete.color,
+      // 'blue' (scheduled) only ever applies to the LinkedIn dot, never to content-complete.
+      color: t.status.contentComplete.color as 'green' | 'yellow' | 'red' | 'gray',
     },
     published: {
       isPublished: t.status.published.completed,

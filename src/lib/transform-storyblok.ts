@@ -53,11 +53,6 @@ export function transformStoryblokBlog(story: any): BlogPost {
         timestamp: story.published_at || undefined,
         color: getPublishedColor(story),
       },
-      publishedPubler: {
-        completed: !!content.cm_socialmedia,
-        timestamp: content.cm_publer_published_at,
-        color: content.cm_socialmedia ? 'green' : 'gray',
-      },
     },
     // Publer
     publerPostIds: content.cm_publer_post_ids

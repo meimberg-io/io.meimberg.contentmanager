@@ -196,6 +196,10 @@ textarea {
     @apply bg-[hsl(var(--status-gray))/30] text-[hsl(var(--status-gray))];
   }
 
+  .status-blue {
+    @apply bg-[hsl(var(--status-blue))] text-white;
+  }
+
   .image-card {
     @apply relative overflow-hidden rounded-xl bg-card border border-border/50 transition-all duration-300;
     box-shadow: var(--shadow-card);
