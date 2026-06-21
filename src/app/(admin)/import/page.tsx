@@ -12,8 +12,8 @@ import {
   AlertCircle,
   CheckCircle,
   FileText,
-  Linkedin,
 } from "lucide-react";
+import { LinkedInIcon } from "@/components/icons/LinkedInIcon";
 import { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -361,7 +361,7 @@ export default function ImportPage() {
                         : "text-muted-foreground hover:bg-muted"
                     )}
                   >
-                    <Linkedin className="h-3.5 w-3.5" />
+                    <LinkedInIcon className="h-3.5 w-3.5" />
                     LinkedIn
                   </button>
                 </div>

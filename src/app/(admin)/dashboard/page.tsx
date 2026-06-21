@@ -3,7 +3,8 @@
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ActivityList } from "@/components/dashboard/ActivityList";
 import { Button } from "@/components/ui/button";
-import { FileText, CheckCircle, Globe, Linkedin, Upload, FolderOpen, PlusCircle } from "lucide-react";
+import { FileText, CheckCircle, Globe, Upload, FolderOpen, PlusCircle } from "lucide-react";
+import { LinkedInIcon } from "@/components/icons/LinkedInIcon";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
@@ -121,7 +122,7 @@ export default function DashboardPage() {
         <StatCard
           title="LinkedIn"
           value={stats.socialMediaPosts}
-          icon={Linkedin}
+          icon={LinkedInIcon}
           variant="purple"
           className="animate-slide-up"
           style={{ animationDelay: "150ms" }}

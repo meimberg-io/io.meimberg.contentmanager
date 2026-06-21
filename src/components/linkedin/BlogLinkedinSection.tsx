@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { LinkedinPost } from "@/types";
 import { LinkedinEditor, type BlogParentInfo } from "@/components/linkedin/LinkedinEditor";
 import { Button } from "@/components/ui/button";
-import { Linkedin, Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
+import { LinkedInIcon } from "@/components/icons/LinkedInIcon";
 import { toast } from "@/hooks/use-toast";
 
 interface BlogLinkedinSectionProps {
@@ -72,7 +73,7 @@ export function BlogLinkedinSection({ blogUuid, blogSlug, blogTitle }: BlogLinke
     <div className="animate-fade-in" style={{ animationDelay: "150ms" }}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-display text-lg font-semibold flex items-center gap-2">
-          <Linkedin className="h-5 w-5 text-[#0a66c2]" />
+          <LinkedInIcon className="h-5 w-5 text-[#0a66c2]" />
           LinkedIn
         </h2>
         <Button

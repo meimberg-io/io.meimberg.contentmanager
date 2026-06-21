@@ -14,9 +14,9 @@ import {
   Search,
   Menu,
   X,
-  Linkedin,
   CalendarClock,
 } from "lucide-react";
+import { LinkedInIcon } from "@/components/icons/LinkedInIcon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -40,7 +40,7 @@ const navItems = [
   { label: "Create", icon: PlusCircle, path: "/create" },
   { label: "Import", icon: Upload, path: "/import" },
   { label: "All Posts", icon: FileText, path: "/posts" },
-  { label: "LinkedIn", icon: Linkedin, path: "/linkedin" },
+  { label: "LinkedIn", icon: LinkedInIcon, path: "/linkedin" },
   { label: "Geplant", icon: CalendarClock, path: "/schedule" },
   { label: "Settings", icon: Settings, path: "/settings" },
 ];
