@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Blogmanager",
+  title: "SmartEditor",
   description: "Manage blog content and publish to multiple channels",
   icons: {
     icon: [

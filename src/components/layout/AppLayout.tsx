@@ -76,7 +76,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 className="h-9 w-9 rounded-lg"
               />
               <span className="hidden font-display text-xl font-semibold tracking-tight sm:block">
-                Blogmanager
+                SmartEditor
               </span>
             </Link>
 
