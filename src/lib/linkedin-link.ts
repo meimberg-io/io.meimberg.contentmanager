@@ -40,7 +40,9 @@ export function buildBlogLinkPreview(uuid: string, blogStory: any): BlogLinkPrev
   const content = blogStory?.content || {}
   const contentType: 'blog' | 'article' = content.component === 'article' ? 'article' : 'blog'
   const fullSlug: string = blogStory?.full_slug || `${contentType === 'article' ? 'a' : 'b'}/${blogStory?.slug || ''}`
-  const published = blogStory?.published === true || !!blogStory?.published_at
+  // `published` only — not `published_at` (Storyblok keeps published_at after an
+  // unpublish, so it would falsely report an unpublished blog as live / unfurlable).
+  const published = blogStory?.published === true
 
   return {
     uuid,

@@ -50,7 +50,7 @@ export async function GET() {
           const title = c.pagetitle || c.teasertitle || story.name || story.slug || uuid
           const published = isLinkedin
             ? !!c.cm_publer_published_at
-            : story.published === true || !!story.published_at
+            : story.published === true
           meta.set(uuid, { title, slug: story.slug || '', storyId: String(story.id || ''), exists: true, published })
         } catch {
           meta.set(uuid, { title: '(unbekannt)', slug: '', storyId: '', exists: false, published: false })

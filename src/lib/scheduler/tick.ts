@@ -178,7 +178,9 @@ async function isPublishedOrMissing(entry: ScheduleQueueEntry): Promise<boolean>
     if (!story) return true // deleted
     const c = story.content || {}
     if (entry.typ === 'linkedin') return !!c.cm_publer_published_at
-    return story.published === true || !!story.published_at
+    // `published` only: a story unpublished after a prior publish keeps published_at
+    // set, but is NOT live — it must stay queued so the scheduler re-publishes it.
+    return story.published === true
   } catch {
     return false // on resolve error keep the entry (safer than dropping)
   }

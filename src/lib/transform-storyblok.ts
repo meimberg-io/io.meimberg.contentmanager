@@ -49,7 +49,7 @@ export function transformStoryblokBlog(story: any): BlogPost {
         color: getContentCompleteColor(content),
       },
       published: {
-        completed: story.published === true || !!story.published_at,
+        completed: story.published === true,
         timestamp: story.published_at || undefined,
         color: getPublishedColor(story),
       },
@@ -163,10 +163,12 @@ function getContentCompleteColor(content: any): 'green' | 'yellow' | 'red' | 'gr
 }
 
 function getPublishedColor(story: any): 'green' | 'yellow' | 'red' | 'gray' {
-  // Storyblok Management API: published_at is set when the story has been published
-  const isPublished = story.published === true || !!story.published_at
+  // `published` is the authoritative current state. `published_at` must NOT be used
+  // here: Storyblok keeps it set after an unpublish (it equals first_published_at),
+  // so a previously-published-then-unpublished story would wrongly read as published.
+  const isPublished = story.published === true
   if (!isPublished) {
-    return 'red' // Not published (draft)
+    return 'red' // Not published (draft or unpublished)
   }
   if (story.unpublished_changes) {
     return 'yellow' // Published but has unpublished changes
