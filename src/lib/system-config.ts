@@ -105,17 +105,33 @@ export async function getSystemConfig(options?: { fresh?: boolean }): Promise<Sy
       return {}
     }
 
-    const response = await fetch(
-      `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories/${storyId}`,
-      {
-        headers: {
-          'Authorization': MANAGEMENT_TOKEN,
-          'Content-Type': 'application/json'
+    // Retry on 429: a config read often trails a burst of Management-API writes
+    // (e.g. schedule assign fires several calls in <1s), and Storyblok's ~5 req/s
+    // limit would otherwise make this read fail and silently degrade to {} — which
+    // surfaces in the UI as "no schedules" until a manual reload.
+    let response: Response | null = null
+    let retries = 3
+    let delay = 200
+    while (retries > 0) {
+      response = await fetch(
+        `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories/${storyId}`,
+        {
+          headers: {
+            'Authorization': MANAGEMENT_TOKEN,
+            'Content-Type': 'application/json'
+          }
         }
+      )
+      if (response.status === 429 && retries > 1) {
+        retries--
+        await new Promise(resolve => setTimeout(resolve, delay))
+        delay *= 2
+        continue
       }
-    )
+      break
+    }
 
-    if (!response.ok) {
+    if (!response || !response.ok) {
       return {}
     }
 
@@ -235,6 +251,11 @@ export async function updateSystemConfig(updates: Partial<SystemConfig>): Promis
     )
 
     if (response.ok) {
+      // Warm the cache with the config we just wrote so an immediate follow-up read
+      // (e.g. ScheduleAssign re-fetching /api/settings right after assign) returns the
+      // new state without another Storyblok round-trip — closing the read-after-write
+      // rate-limit window that briefly flashed "no schedules" until a manual reload.
+      cachedConfig = { data: updatedConfig, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS }
       await new Promise(resolve => setTimeout(resolve, 100))
       return updatedConfig
     }
