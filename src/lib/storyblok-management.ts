@@ -711,6 +711,8 @@ export interface StoryListMeta {
   uuid: string
   name: string
   slug: string
+  /** Folder-prefixed slug (e.g. "b/my-post") — distinguishes blog (`b/`) vs article (`a/`). */
+  fullSlug: string
   /** Storyblok native publish state (the boolean — never derived from published_at). */
   published: boolean
 }
@@ -755,6 +757,7 @@ export async function resolveStoryMetaByUuids(uuids: string[]): Promise<Map<stri
         uuid: s.uuid,
         name: s.name || '',
         slug: s.slug || '',
+        fullSlug: s.full_slug || '',
         published: s.published === true,
       })
     }

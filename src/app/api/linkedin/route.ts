@@ -5,11 +5,12 @@ import {
   updateLinkedinPost,
   deletePost,
   resolveBlogStoryByUuid,
+  resolveStoryMetaByUuids,
   type LinkedinPostData,
 } from '@/lib/storyblok-management'
 import { fetchLinkedinPosts, fetchLinkedinPostsByBlogUuid } from '@/lib/storyblok'
 import { transformStoryblokLinkedin } from '@/lib/transform-storyblok'
-import { buildBlogLinkPreview, type BlogLinkPreview } from '@/lib/linkedin-link'
+import { buildBlogLinkPreview, buildBlogLinkPreviewFromListMeta, type BlogLinkPreview } from '@/lib/linkedin-link'
 import type { LinkedinPost } from '@/types'
 
 /**
@@ -42,19 +43,25 @@ export async function GET(request: Request) {
     const { stories } = await fetchLinkedinPosts()
     const posts: LinkedinPost[] = stories.map(transformStoryblokLinkedin)
 
-    // Resolve unique parent blog UUIDs → link preview for parent markers.
+    // Resolve unique parent blog UUIDs → link preview for parent markers. ONE batched
+    // by_uuids lookup instead of two Management-API requests per parent in an unbounded
+    // Promise.all (which flooded Storyblok's ~5 req/s limit and could 429 the whole
+    // list). The list markers (LinkedinCard) only show title + slug, so the content-less
+    // list meta suffices; a uuid missing from the batch just yields no marker.
     const uniqueParentUuids = [
       ...new Set(posts.map((p) => p.blogParentUuid).filter((u): u is string => !!u)),
     ]
     const parents: Record<string, BlogLinkPreview> = {}
-    await Promise.all(
-      uniqueParentUuids.map(async (uuid) => {
-        const blog = await resolveBlogStoryByUuid(uuid)
-        if (blog) {
-          parents[uuid] = buildBlogLinkPreview(uuid, blog)
-        }
+    const parentMeta = await resolveStoryMetaByUuids(uniqueParentUuids)
+    for (const [uuid, m] of parentMeta) {
+      parents[uuid] = buildBlogLinkPreviewFromListMeta({
+        uuid,
+        slug: m.slug,
+        fullSlug: m.fullSlug,
+        name: m.name,
+        published: m.published,
       })
-    )
+    }
 
     return NextResponse.json({ posts, total: posts.length, parents })
   } catch (error: any) {

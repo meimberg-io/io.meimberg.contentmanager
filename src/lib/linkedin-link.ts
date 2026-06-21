@@ -57,3 +57,31 @@ export function buildBlogLinkPreview(uuid: string, blogStory: any): BlogLinkPrev
     published,
   }
 }
+
+/**
+ * Build a link preview from the Management *list* endpoint's top-level fields only —
+ * the list omits nested `content`, so there is NO OG image here. Used for the LinkedIn
+ * list's parent markers, which render just title + slug; the full-content preview
+ * (with image) comes from buildBlogLinkPreview for the single-post editor card.
+ * Batches many parents into one `by_uuids` request instead of two requests per parent.
+ */
+export function buildBlogLinkPreviewFromListMeta(meta: {
+  uuid: string
+  slug: string
+  fullSlug: string
+  name: string
+  published: boolean
+}): BlogLinkPreview {
+  const contentType: 'blog' | 'article' = meta.fullSlug.startsWith('a/') ? 'article' : 'blog'
+  const fullSlug = meta.fullSlug || `${contentType === 'article' ? 'a' : 'b'}/${meta.slug}`
+  return {
+    uuid: meta.uuid,
+    slug: meta.slug,
+    fullSlug,
+    contentType,
+    title: meta.name || meta.slug || '',
+    imageUrl: undefined,
+    url: buildBlogUrl(fullSlug),
+    published: meta.published,
+  }
+}
