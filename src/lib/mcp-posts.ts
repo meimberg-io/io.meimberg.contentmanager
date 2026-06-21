@@ -90,7 +90,7 @@ function typeOf(story: any): PostType {
  * all schedules (MICM-30/32). Orphaned ("neu zuordnen") and already-fired/failed
  * instances are not "scheduled".
  */
-async function buildScheduledMap(): Promise<Map<string, string | null>> {
+export async function buildScheduledMap(): Promise<Map<string, string | null>> {
   const settings = await getSettings()
   const schedules: Schedule[] = Array.isArray(settings.schedules) ? settings.schedules : []
   const map = new Map<string, string | null>()
