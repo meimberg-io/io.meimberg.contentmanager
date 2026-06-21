@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-guard'
 import { getSettings } from '@/lib/settings-storage'
-import { resolveBlogStoryByUuid } from '@/lib/storyblok-management'
+import { resolveStoryMetaByUuids, getPostById } from '@/lib/storyblok-management'
 import { instanceDate, SCHEDULE_HORIZON_WEEKS } from '@/lib/schedule-time'
 import { isOrphan } from '@/lib/scheduler/normalize'
 import type { Schedule, SlotInstance } from '@/types'
@@ -38,28 +38,56 @@ export async function GET() {
     const schedules: Schedule[] = Array.isArray(settings.schedules) ? settings.schedules : []
 
     const uuids = Array.from(new Set(schedules.flatMap((s) => s.slotInstances.map((i) => i.storyUuid))))
-    const meta = new Map<string, StoryMeta>()
 
-    await Promise.all(
-      uuids.map(async (uuid) => {
-        try {
-          const story = await resolveBlogStoryByUuid(uuid)
-          if (!story) {
-            meta.set(uuid, { title: '(gelöscht)', slug: '', storyId: '', exists: false, published: false })
-            return
-          }
-          const c = story.content || {}
-          const isLinkedin = c.component === 'linkedin_post'
-          const title = c.pagetitle || c.teasertitle || story.name || story.slug || uuid
-          const published = isLinkedin ? !!c.cm_publer_published_at : story.published === true
-          meta.set(uuid, { title, slug: story.slug || '', storyId: String(story.id || ''), exists: true, published })
-        } catch {
-          meta.set(uuid, { title: '(unbekannt)', slug: '', storyId: '', exists: false, published: false })
-        }
-      }),
-    )
+    // ONE batched existence/meta lookup for every instance. The old code
+    // fired two Management-API requests PER uuid inside an unbounded Promise.all,
+    // which blew past Storyblok's ~5 req/s limit and made a 429'd lookup of a *live*
+    // story render identically to a real deletion — the phantom "(gelöscht)" flicker.
+    // A uuid absent from this map is genuinely deleted; if the lookup itself throws we
+    // let it bubble to the 500 handler rather than fabricate deletions.
+    const metaByUuid = await resolveStoryMetaByUuids(uuids)
 
-    const fallback: StoryMeta = { title: '', slug: '', storyId: '', exists: false, published: false }
+    // LinkedIn instances are draft-only in Storyblok (native `published` is always
+    // false); their real publish state lives in the content field cm_publer_published_at,
+    // which the list endpoint omits. Enrich only those — sequentially + spaced — and
+    // fall back to the list meta on failure. Never downgrade to "(gelöscht)".
+    const linkedinUuids = Array.from(
+      new Set(
+        schedules.flatMap((s) =>
+          s.slotInstances.filter((i) => i.typ === 'linkedin').map((i) => i.storyUuid),
+        ),
+      ),
+    ).filter((u) => metaByUuid.has(u))
+    const linkedinExtra = new Map<string, { published: boolean; title?: string }>()
+    for (const uuid of linkedinUuids) {
+      const m = metaByUuid.get(uuid)
+      if (!m?.id) continue
+      try {
+        const story = await getPostById(m.id)
+        const c = story?.content || {}
+        linkedinExtra.set(uuid, {
+          published: !!c.cm_publer_published_at,
+          title: c.pagetitle || c.teasertitle || undefined,
+        })
+      } catch {
+        // keep list-meta fallback
+      }
+      await new Promise((r) => setTimeout(r, 200))
+    }
+
+    const metaFor = (uuid: string, typ: SlotInstance['typ']): StoryMeta => {
+      const m = metaByUuid.get(uuid)
+      // Absent from the authoritative batched response → genuinely deleted.
+      if (!m) return { title: '(gelöscht)', slug: '', storyId: '', exists: false, published: false }
+      const extra = linkedinExtra.get(uuid)
+      return {
+        title: extra?.title || m.name || m.slug || uuid,
+        slug: m.slug,
+        storyId: m.id,
+        exists: true,
+        published: typ === 'linkedin' ? extra?.published ?? false : m.published,
+      }
+    }
 
     const out = schedules.map((s) => {
       const tz = s.timezone || DEFAULT_TZ
@@ -79,7 +107,7 @@ export async function GET() {
           errorCount: i.errorCount || 0,
           lastError: i.lastError,
           lastErrorAt: i.lastErrorAt,
-          ...(meta.get(i.storyUuid) || { ...fallback, title: i.storyUuid }),
+          ...metaFor(i.storyUuid, i.typ),
         }
       }
       return {

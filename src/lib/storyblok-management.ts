@@ -705,6 +705,63 @@ export async function resolveBlogStoryByUuid(uuid: string) {
   }
 }
 
+/** Top-level story metadata from the Management stories *list* endpoint (no nested content). */
+export interface StoryListMeta {
+  id: string
+  uuid: string
+  name: string
+  slug: string
+  /** Storyblok native publish state (the boolean — never derived from published_at). */
+  published: boolean
+}
+
+/**
+ * Batch-resolve story metadata for many UUIDs in as few Management-API calls as
+ * possible. One `?by_uuids=` list request per ≤100 UUIDs replaces the old
+ * two-requests-PER-uuid fan-out (`getStoryIdByUuid` + `getPostById`) that flooded
+ * Storyblok's ~5 req/s limit and made unrelated stories flicker as "(gelöscht)".
+ *
+ * The list endpoint omits nested `content`, so this returns only top-level fields —
+ * enough for the editorial plan's blog/article rows (where `name` == the post title).
+ * Callers that need content fields (a LinkedIn post's Publer publish state) enrich
+ * those few separately via getPostById.
+ *
+ * Returns a Map keyed by uuid. A uuid ABSENT from the map is authoritatively
+ * non-existent (deleted). A THROWN error means the lookup itself failed (rate limit /
+ * outage) — callers MUST propagate that, never treat it as deletion.
+ */
+export async function resolveStoryMetaByUuids(uuids: string[]): Promise<Map<string, StoryListMeta>> {
+  if (!MANAGEMENT_TOKEN) throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
+  const out = new Map<string, StoryListMeta>()
+  const unique = Array.from(new Set(uuids.filter(Boolean)))
+  // Storyblok's list per_page max is 100; per_page MUST be set explicitly — the
+  // default of 25 would silently drop the rest of a larger batch, falsely marking
+  // those stories deleted.
+  const CHUNK = 100
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK)
+    const response = await managementFetch(
+      `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?per_page=100&by_uuids=${encodeURIComponent(chunk.join(','))}`,
+      { headers: { 'Authorization': MANAGEMENT_TOKEN, 'Content-Type': 'application/json' } },
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to resolve story meta (${response.status} ${response.statusText})`)
+    }
+    const data = await response.json()
+    for (const s of data.stories || []) {
+      if (!s?.uuid) continue
+      out.set(s.uuid, {
+        id: String(s.id ?? ''),
+        uuid: s.uuid,
+        name: s.name || '',
+        slug: s.slug || '',
+        published: s.published === true,
+      })
+    }
+  }
+  return out
+}
+
 /**
  * Create a new linkedin_post story (draft-only). When attached to a blog
  * (blogParentUuid set), cm_blog_ref is filled with the blog UUID and the blog's
