@@ -51,7 +51,7 @@ interface GridCell {
   slot: Slot;
   weekStart: string;
   date: Date;
-  inst: PlanInstance | null;
+  insts: PlanInstance[];
 }
 function buildGrid(sched: PlanSchedule) {
   const tz = sched.timezone || DEFAULT_TZ;
@@ -64,15 +64,21 @@ function buildGrid(sched: PlanSchedule) {
   const liveWeeks = sched.instances.filter((i) => !i.isOrphan && isLive(i)).map((i) => i.weekStart);
   const weekStarts = Array.from(new Set([...horizonWeeks, ...liveWeeks])).sort();
 
-  const byCell = new Map<string, PlanInstance>();
+  // A slot/week can hold more than one instance (e.g. a published blog plus its
+  // coupled LinkedIn post retrying on the same slot, MICM-35) — group, never overwrite.
+  const byCell = new Map<string, PlanInstance[]>();
   for (const i of sched.instances) {
-    if (!i.isOrphan && i.slotId) byCell.set(cellKey(i.slotId, i.weekStart), i);
+    if (i.isOrphan || !i.slotId) continue;
+    const k = cellKey(i.slotId, i.weekStart);
+    const arr = byCell.get(k);
+    if (arr) arr.push(i);
+    else byCell.set(k, [i]);
   }
 
   const weeks = weekStarts.map((weekStart) => ({
     weekStart,
     cells: sortedSlots.map(
-      (slot): GridCell => ({ slot, weekStart, date: instanceDate(slot, weekStart, tz), inst: byCell.get(cellKey(slot.id, weekStart)) || null }),
+      (slot): GridCell => ({ slot, weekStart, date: instanceDate(slot, weekStart, tz), insts: byCell.get(cellKey(slot.id, weekStart)) || [] }),
     ),
   }));
   const orphans = sched.instances.filter((i) => i.isOrphan);
@@ -142,8 +148,11 @@ function PostChip({ inst, onRemove, draggable }: { inst: PlanInstance; onRemove:
 
 function SlotCell({ cell, timezone, onRemove }: { cell: GridCell; timezone: string; onRemove: (uuid: string) => void }) {
   const id = cellKey(cell.slot.id, cell.weekStart);
-  // A cell accepts a drop unless it holds a non-live (historic) instance.
-  const droppable = !cell.inst || isLive(cell.inst);
+  const empty = cell.insts.length === 0;
+  // Droppable unless the cell holds only non-live (historic) instances; a live instance
+  // is a swap target. Co-located instances (published blog + coupled LinkedIn) keep it
+  // droppable — the move route swaps with the live occupant (MICM-35).
+  const droppable = empty || cell.insts.some(isLive);
   const { setNodeRef, isOver } = useDroppable({ id, disabled: !droppable });
   const past = cell.date.getTime() < Date.now();
   return (
@@ -151,14 +160,18 @@ function SlotCell({ cell, timezone, onRemove }: { cell: GridCell; timezone: stri
       ref={setNodeRef}
       className={`min-w-[240px] flex-1 rounded-lg border p-2 transition-colors ${
         isOver ? "border-blue-400 ring-2 ring-blue-400/40" : "border-border/40"
-      } ${past && !cell.inst ? "opacity-50" : ""}`}
+      } ${past && empty ? "opacity-50" : ""}`}
     >
       <div className="mb-1.5 text-[11px] font-medium text-muted-foreground tabular-nums">{formatDateTime(cell.date, timezone)}</div>
-      {cell.inst ? (
-        <PostChip inst={cell.inst} draggable={isLive(cell.inst)} onRemove={() => onRemove(cell.inst!.storyUuid)} />
-      ) : (
+      {empty ? (
         <div className="rounded-md border border-dashed border-border/40 px-2 py-2 text-center text-xs italic text-muted-foreground/60">
           frei
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {cell.insts.map((inst) => (
+            <PostChip key={inst.instanceId} inst={inst} draggable={isLive(inst)} onRemove={() => onRemove(inst.storyUuid)} />
+          ))}
         </div>
       )}
     </div>

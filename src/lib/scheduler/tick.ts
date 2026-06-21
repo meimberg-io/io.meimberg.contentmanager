@@ -117,17 +117,23 @@ export async function runScheduleTick(now: Date = new Date()): Promise<TickResul
         delete inst.lastErrorAt
         changed = true
         if (outcome.failedAttached.length > 0) {
+          // Partial coupled failure: blog is live but an attached LinkedIn post failed.
+          // Re-enter it as a real, slot-bound `pending` instance on the SAME slot/week
+          // as the blog — the failure is transient (Publer outage), so it retries ASAP
+          // via the normal errorCount/RETRY_CAP loop and self-resolves via
+          // isPublishedOrMissing. Never a slotId:null orphan dead-end (MICM-35).
           for (const f of outcome.failedAttached) {
+            const alreadyLive = schedule.slotInstances.some(
+              (i) => i.storyUuid === f.storyUuid && (i.status === 'pending' || i.status === 'failed'),
+            )
+            if (alreadyLive) continue
             schedule.slotInstances.push({
-              id: `orphan-${f.storyUuid}`,
-              slotId: null,
+              id: crypto.randomUUID(),
+              slotId: inst.slotId,
               weekStart: inst.weekStart,
               storyUuid: f.storyUuid,
               typ: 'linkedin',
-              status: 'failed',
-              errorCount: RETRY_CAP,
-              lastError: f.error,
-              lastErrorAt: now.toISOString(),
+              status: 'pending',
             })
           }
           results.push({
@@ -136,7 +142,7 @@ export async function runScheduleTick(now: Date = new Date()): Promise<TickResul
             occurrence: occIso,
             entry: inst,
             ok: true,
-            error: `Blog live, ${outcome.failedAttached.length} LinkedIn-Post(s) fehlgeschlagen → neu zuordnen`,
+            error: `Blog live, ${outcome.failedAttached.length} LinkedIn-Post(s) fehlgeschlagen → Retry beim nächsten Tick`,
           })
         } else {
           results.push({ ...base, fired: true, occurrence: occIso, entry: inst, ok: true })

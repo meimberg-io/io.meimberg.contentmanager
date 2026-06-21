@@ -60,6 +60,14 @@ export async function POST(request: Request) {
     }
     inst.slotId = slotId
     inst.weekStart = weekStart
+    // Rescheduling a failed instance re-arms it (→ pending, error fields cleared) so the
+    // engine fires it again — otherwise "drag to reschedule" silently leaves it dead (MICM-35).
+    if (inst.status === 'failed') {
+      inst.status = 'pending'
+      delete inst.errorCount
+      delete inst.lastError
+      delete inst.lastErrorAt
+    }
 
     await updateSettings({ schedules })
     return NextResponse.json({ ok: true })
