@@ -616,14 +616,12 @@ function extractPublerPostIds(jobResult: any): string[] {
 /**
  * Publish a single LinkedIn post *immediately* via Publer (MICM-17).
  * The Content Manager now owns all timing (the scheduler decides WHEN and calls this
- * at the slot moment), so Publer is used as a plain "post now" API: the post is
- * scheduled with an explicit `scheduled_at` of now — no AutoSchedule labels/range.
+ * at the slot moment), so Publer is used as a plain "post now" API: the post hits
+ * Publer's Immediate-Publishing endpoint (`/posts/schedule/publish`) with no
+ * `scheduled_at`, which bypasses Publer's AutoSchedule/calendar path entirely (MICM-33).
  * - With mediaUrl (image): upload via uploadMediaFromUrl, type 'photo'.
  * - Without media: type 'status' (text-only; an appended link unfurls into a card).
  * Returns the job id and the real Publer post ids extracted from the job result.
- *
- * NOTE: the immediate-post contract (state 'scheduled' + per-post `scheduled_at` = now)
- * follows Publer's documented scheduling shape; verify against the live API on rollout.
  */
 export async function scheduleLinkedinPost(params: {
   text: string
@@ -646,8 +644,8 @@ export async function scheduleLinkedinPost(params: {
   }
   if (media) networkConfig.media = media
 
-  // Post immediately: explicit `scheduled_at` = now, no AutoSchedule label/range (MICM-17).
-  const scheduledAt = new Date().toISOString()
+  // Post immediately via Publer's Immediate-Publishing endpoint — no `scheduled_at`,
+  // so Publer bypasses its AutoSchedule/calendar path (MICM-17, MICM-33).
   const body = {
     bulk: {
       state: 'scheduled',
@@ -655,13 +653,12 @@ export async function scheduleLinkedinPost(params: {
         {
           networks: { linkedin: networkConfig },
           accounts: [{ id: accountId }],
-          scheduled_at: scheduledAt,
         },
       ],
     },
   }
 
-  const response = await fetch(`${PUBLER_API_URL}/posts/schedule`, {
+  const response = await fetch(`${PUBLER_API_URL}/posts/schedule/publish`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
