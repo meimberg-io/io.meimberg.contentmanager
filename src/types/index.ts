@@ -2,7 +2,8 @@
 export interface StatusCheck {
   completed: boolean;
   timestamp?: string;
-  color: 'green' | 'yellow' | 'red' | 'gray';
+  // 'blue' = scheduled (queued for publishing) — currently used by the LinkedIn dot.
+  color: 'green' | 'yellow' | 'red' | 'gray' | 'blue';
   manuallyConfirmed?: boolean;
   errorMessage?: string;
 }

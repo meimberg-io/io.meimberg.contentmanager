@@ -40,6 +40,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
+import { StatusCheck } from "@/types";
 import { ymdInZone } from "@/lib/schedule-time";
 import { toast } from "@/hooks/use-toast";
 
@@ -53,7 +54,7 @@ interface StatusFilter {
 interface MultiStateFilters {
   contentComplete: StatusFilter;
   published: StatusFilter;
-  publishedPubler: StatusFilter;
+  linkedin: StatusFilter;
 }
 
 const defaultFilter: StatusFilter = { red: false, yellow: false, green: false };
@@ -115,13 +116,14 @@ function StatusFilterGrid({
   counts: {
     contentComplete: { red: number; yellow: number; green: number };
     published: { red: number; yellow: number; green: number };
-    publishedPubler: { red: number; yellow: number; green: number };
+    linkedin: { red: number; yellow: number; green: number };
   };
 }) {
   const rows: { key: keyof MultiStateFilters; label: string; hasYellow: boolean }[] = [
     { key: 'contentComplete', label: 'Content', hasYellow: true },
     { key: 'published', label: 'Published', hasYellow: false },
-    { key: 'publishedPubler', label: 'Publer', hasYellow: false },
+    // LinkedIn dot: red button = no LinkedIn post (gray), yellow = in progress/scheduled, green = published.
+    { key: 'linkedin', label: 'LinkedIn', hasYellow: true },
   ];
 
   return (
@@ -177,6 +179,24 @@ function ScheduledFilterRow({ active, count, onClick }: { active: boolean; count
   );
 }
 
+// Worklist default (MICM): hide posts that are completely final. On by default; toggle to reveal them.
+function FinalizedToggle({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full h-8 px-3 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-2 cursor-pointer",
+        active
+          ? "bg-secondary text-foreground"
+          : "bg-secondary/40 text-muted-foreground hover:bg-secondary/70"
+      )}
+    >
+      {active && <Check className="h-3 w-3" />}
+      Abgeschlossene ausblenden
+    </button>
+  );
+}
+
 function AllPostsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -189,7 +209,7 @@ function AllPostsPageContent() {
   const [filters, setFilters] = useState<MultiStateFilters>({
     contentComplete: { ...defaultFilter },
     published: { ...defaultFilter },
-    publishedPubler: { ...defaultFilter },
+    linkedin: { ...defaultFilter },
   });
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,6 +218,10 @@ function AllPostsPageContent() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [scheduledMap, setScheduledMap] = useState<Record<string, string>>({});
   const [scheduledOnly, setScheduledOnly] = useState(false);
+  // postId (blog UUID) -> status of the attached LinkedIn post(s), join-derived (MICM: Publer→LinkedIn).
+  const [linkedinStatusMap, setLinkedinStatusMap] = useState<Record<string, StatusCheck>>({});
+  // Worklist default: hide posts that are completely final (nothing left to do).
+  const [hideFinalized, setHideFinalized] = useState(true);
 
   // Sync state FROM URL
   useEffect(() => {
@@ -206,13 +230,15 @@ function AllPostsPageContent() {
     const urlFilters = {
       contentComplete: deserializeFilter(searchParams.get('content')),
       published: deserializeFilter(searchParams.get('published')),
-      publishedPubler: deserializeFilter(searchParams.get('publer')),
+      linkedin: deserializeFilter(searchParams.get('linkedin')),
     };
 
     setViewMode(urlView === 'grid' ? 'grid' : 'list');
     setSearchQuery(urlSearch);
     setFilters(urlFilters);
     setScheduledOnly(searchParams.get('sched') === '1');
+    // `done=1` opts out of the default worklist view (i.e. also show finalized posts).
+    setHideFinalized(searchParams.get('done') !== '1');
     setIsInitialized(true);
   }, [searchParams]);
 
@@ -225,14 +251,15 @@ function AllPostsPageContent() {
       
       const content = serializeFilter(filters.contentComplete);
       const published = serializeFilter(filters.published);
-      const publer = serializeFilter(filters.publishedPubler);
-      
+      const linkedin = serializeFilter(filters.linkedin);
+
       if (content) params.set('content', content);
       if (published) params.set('published', published);
-      if (publer) params.set('publer', publer);
+      if (linkedin) params.set('linkedin', linkedin);
       if (searchQuery) params.set('q', searchQuery);
       if (viewMode === 'grid') params.set('view', 'grid');
       if (scheduledOnly) params.set('sched', '1');
+      if (!hideFinalized) params.set('done', '1');
 
       const queryString = params.toString();
       const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
@@ -241,7 +268,7 @@ function AllPostsPageContent() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [filters, searchQuery, viewMode, scheduledOnly, pathname, router, isInitialized]);
+  }, [filters, searchQuery, viewMode, scheduledOnly, hideFinalized, pathname, router, isInitialized]);
 
   const handleSelect = (id: string, selected: boolean) => {
     const newSelected = new Set(selectedPosts);
@@ -256,9 +283,10 @@ function AllPostsPageContent() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [postsRes, scheduleRes] = await Promise.all([
+        const [postsRes, scheduleRes, linkedinRes] = await Promise.all([
           fetch('/api/posts'),
           fetch('/api/schedule').catch(() => null),
+          fetch('/api/linkedin').catch(() => null),
         ]);
         if (!postsRes.ok) {
           throw new Error(`Failed to fetch posts (${postsRes.status})`);
@@ -268,9 +296,10 @@ function AllPostsPageContent() {
         setPosts(transformedPosts);
 
         // Map storyUuid -> derived slot publish date for scheduled posts (MICM-30/32).
+        // Covers both blog and linkedin instances (keyed by the story UUID).
+        const map: Record<string, string> = {};
         if (scheduleRes && scheduleRes.ok) {
           const sched = await scheduleRes.json();
-          const map: Record<string, string> = {};
           for (const s of sched.schedules || []) {
             for (const inst of s.instances || []) {
               if (inst.status === 'pending' && !inst.isOrphan && inst.date) {
@@ -279,6 +308,33 @@ function AllPostsPageContent() {
             }
           }
           setScheduledMap(map);
+        }
+
+        // Join: blog UUID -> status of its attached LinkedIn post(s). The dot reflects
+        // the *least-done* attachment (yellow > blue > green) so a blog stays in the
+        // worklist until every attached LinkedIn post is published. No attachment = gray.
+        if (linkedinRes && linkedinRes.ok) {
+          const li = await linkedinRes.json();
+          const byParent: Record<string, StatusCheck['color'][]> = {};
+          for (const lp of li.posts || []) {
+            if (!lp.blogParentUuid) continue;
+            const color: StatusCheck['color'] = lp.status?.publishedLinkedIn?.completed
+              ? 'green'
+              : map[lp.id]
+                ? 'blue'
+                : 'yellow';
+            (byParent[lp.blogParentUuid] ||= []).push(color);
+          }
+          const liMap: Record<string, StatusCheck> = {};
+          for (const [parentUuid, colors] of Object.entries(byParent)) {
+            const color: StatusCheck['color'] = colors.includes('yellow')
+              ? 'yellow'
+              : colors.includes('blue')
+                ? 'blue'
+                : 'green';
+            liMap[parentUuid] = { completed: color === 'green', color };
+          }
+          setLinkedinStatusMap(liMap);
         }
       } catch (error) {
         console.error('Failed to load data:', error);
@@ -342,83 +398,90 @@ function AllPostsPageContent() {
     setFilters({
       contentComplete: { ...defaultFilter },
       published: { ...defaultFilter },
-      publishedPubler: { ...defaultFilter },
+      linkedin: { ...defaultFilter },
     });
     setSearchQuery("");
     setScheduledOnly(false);
+    // "Clear" returns to the default worklist view, which hides finalized posts.
+    setHideFinalized(true);
     router.replace(pathname, { scroll: false });
   };
 
   const isFilterActive = (f: StatusFilter) => f.red || f.yellow || f.green;
-  const hasActiveFilters = Object.values(filters).some(isFilterActive) || !!searchQuery || scheduledOnly;
+  // Showing finalized posts (hideFinalized=false) is a deviation from the default view.
+  const hasActiveFilters = Object.values(filters).some(isFilterActive) || !!searchQuery || scheduledOnly || !hideFinalized;
+
+  // The LinkedIn dimension is join-derived (not on post.status); everything else reads post.status.
+  const NO_LINKEDIN: StatusCheck = { completed: false, color: 'gray' };
+  const linkedinStatusOf = (post: any): StatusCheck => linkedinStatusMap[post.id] ?? NO_LINKEDIN;
+  const dimStatus = (post: any, key: keyof MultiStateFilters): StatusCheck =>
+    key === 'linkedin' ? linkedinStatusOf(post) : post.status[key];
 
   const matchesStatusFilter = (status: { completed: boolean; color: string }, filter: StatusFilter): boolean => {
     if (!filter.red && !filter.yellow && !filter.green) return true;
     const { color } = status;
     if (filter.green && color === 'green') return true;
-    if (filter.yellow && color === 'yellow') return true;
+    // 'blue' (scheduled) groups with yellow ("in progress") — only the LinkedIn dot is ever blue.
+    if (filter.yellow && (color === 'yellow' || color === 'blue')) return true;
     if (filter.red && (color === 'red' || color === 'gray')) return true;
     return false;
   };
 
+  const matchesSearch = (post: any): boolean => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      post.pagetitle.toLowerCase().includes(query) ||
+      post.abstract.toLowerCase().includes(query) ||
+      post.teasertitle.toLowerCase().includes(query)
+    );
+  };
+
+  // A post is "final" (nothing left to do) when content + website are done and LinkedIn
+  // is either published or not applicable (gray). Hidden by default (worklist view).
+  const isFinal = (post: any): boolean =>
+    post.status.contentComplete.color === 'green' &&
+    post.status.published.color === 'green' &&
+    (linkedinStatusOf(post).color === 'green' || linkedinStatusOf(post).color === 'gray');
+
   const getStatusCounts = (statusKey: keyof MultiStateFilters) => {
-    const baseFiltered = posts.filter(post => {
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesSearch = 
-          post.pagetitle.toLowerCase().includes(query) ||
-          post.abstract.toLowerCase().includes(query) ||
-          post.teasertitle.toLowerCase().includes(query);
-        if (!matchesSearch) return false;
+    const counted = posts.filter(post => {
+      if (!matchesSearch(post)) return false;
+
+      const keys: (keyof MultiStateFilters)[] = ['contentComplete', 'published', 'linkedin'];
+      for (const k of keys) {
+        if (k === statusKey) continue;
+        if (!matchesStatusFilter(dimStatus(post, k), filters[k])) return false;
       }
-      
-      const otherFilters = {
-        contentComplete: statusKey !== 'contentComplete' ? filters.contentComplete : defaultFilter,
-        published: statusKey !== 'published' ? filters.published : defaultFilter,
-        publishedPubler: statusKey !== 'publishedPubler' ? filters.publishedPubler : defaultFilter,
-      };
-      
-      if (!matchesStatusFilter(post.status.contentComplete, otherFilters.contentComplete)) return false;
-      if (!matchesStatusFilter(post.status.published, otherFilters.published)) return false;
-      if (!matchesStatusFilter(post.status.publishedPubler, otherFilters.publishedPubler)) return false;
-      
       return true;
     });
-    
+
     let red = 0, yellow = 0, green = 0;
-    baseFiltered.forEach(post => {
-      const color = post.status[statusKey].color;
+    counted.forEach(post => {
+      const color = dimStatus(post, statusKey).color;
       if (color === 'green') green++;
-      else if (color === 'yellow') yellow++;
+      else if (color === 'yellow' || color === 'blue') yellow++;
       else red++;
     });
-    
+
     return { red, yellow, green };
   };
 
   const contentCounts = getStatusCounts('contentComplete');
   const publishedCounts = getStatusCounts('published');
-  const publerCounts = getStatusCounts('publishedPubler');
+  const linkedinCounts = getStatusCounts('linkedin');
 
   const baseFiltered = posts.filter((post) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        post.pagetitle.toLowerCase().includes(query) ||
-        post.abstract.toLowerCase().includes(query) ||
-        post.teasertitle.toLowerCase().includes(query);
-      if (!matchesSearch) return false;
-    }
-
+    if (!matchesSearch(post)) return false;
     if (!matchesStatusFilter(post.status.contentComplete, filters.contentComplete)) return false;
     if (!matchesStatusFilter(post.status.published, filters.published)) return false;
-    if (!matchesStatusFilter(post.status.publishedPubler, filters.publishedPubler)) return false;
-
+    if (!matchesStatusFilter(linkedinStatusOf(post), filters.linkedin)) return false;
     return true;
   });
 
   const scheduledCount = baseFiltered.filter((post) => scheduledMap[post.id]).length;
-  const filteredPosts = scheduledOnly ? baseFiltered.filter((post) => scheduledMap[post.id]) : baseFiltered;
+  const withScheduled = scheduledOnly ? baseFiltered.filter((post) => scheduledMap[post.id]) : baseFiltered;
+  const filteredPosts = hideFinalized ? withScheduled.filter((post) => !isFinal(post)) : withScheduled;
 
   if (loading && posts.length === 0) {
     return (
@@ -454,10 +517,11 @@ function AllPostsPageContent() {
               counts={{
                 contentComplete: contentCounts,
                 published: publishedCounts,
-                publishedPubler: publerCounts,
+                linkedin: linkedinCounts,
               }}
             />
             <ScheduledFilterRow active={scheduledOnly} count={scheduledCount} onClick={() => setScheduledOnly((v) => !v)} />
+            <FinalizedToggle active={hideFinalized} onClick={() => setHideFinalized((v) => !v)} />
           </div>
 
           <div className="space-y-2">
@@ -530,10 +594,11 @@ function AllPostsPageContent() {
               counts={{
                 contentComplete: contentCounts,
                 published: publishedCounts,
-                publishedPubler: publerCounts,
+                linkedin: linkedinCounts,
               }}
             />
             <ScheduledFilterRow active={scheduledOnly} count={scheduledCount} onClick={() => setScheduledOnly((v) => !v)} />
+            <FinalizedToggle active={hideFinalized} onClick={() => setHideFinalized((v) => !v)} />
           </div>
         )}
 
@@ -629,6 +694,7 @@ function AllPostsPageContent() {
                 hideActions
                 selectionMode={selectedPosts.size > 0}
                 scheduledAt={scheduledMap[post.id]}
+                linkedinStatus={linkedinStatusOf(post)}
               />
             </div>
           ))}

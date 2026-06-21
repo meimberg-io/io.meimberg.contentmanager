@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BlogPost } from "@/types";
+import { BlogPost, StatusCheck } from "@/types";
 import { StatusRow } from "@/components/ui/StatusIcon";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +47,15 @@ interface PostCardProps {
   selectionMode?: boolean;
   /** Projected publish date ("YYYY-MM-DD") if the post is scheduled (MICM-30). */
   scheduledAt?: string;
+  /**
+   * Status of the LinkedIn post attached to this blog (join-derived in the list page).
+   * Defaults to gray ("no LinkedIn post attached") when not provided.
+   */
+  linkedinStatus?: StatusCheck;
 }
+
+/** Gray = no LinkedIn post is attached to this blog. */
+const NO_LINKEDIN: StatusCheck = { completed: false, color: "gray" };
 
 function OriginIcon({ origin }: { origin?: 'import' | 'create' | 'mcp' }) {
   if (origin === 'mcp') {
@@ -95,7 +103,7 @@ function OriginIcon({ origin }: { origin?: 'import' | 'create' | 'mcp' }) {
   return null
 }
 
-export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideActions = false, selectionMode = false, scheduledAt }: PostCardProps) {
+export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideActions = false, selectionMode = false, scheduledAt, linkedinStatus = NO_LINKEDIN }: PostCardProps) {
   const router = useRouter();
 
   if (viewMode === "list") {
@@ -145,7 +153,7 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
           <span className={cn("text-xs whitespace-nowrap", scheduledAt ? "text-blue-400" : "text-muted-foreground")} title={scheduledAt ? "Geplanter Veröffentlichungstermin" : undefined}>
             {scheduledAt || post.date || 'No date'}
           </span>
-          <StatusRow status={post.status} scheduled={!!scheduledAt} />
+          <StatusRow status={post.status} linkedin={linkedinStatus} scheduled={!!scheduledAt} />
         </div>
 
         {!hideActions && (
@@ -214,7 +222,7 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
             {post.origin && <OriginIcon origin={post.origin} />}
             {scheduledAt || post.date || 'No date'}
           </span>
-          <StatusRow status={post.status} scheduled={!!scheduledAt} />
+          <StatusRow status={post.status} linkedin={linkedinStatus} scheduled={!!scheduledAt} />
         </div>
       </div>
     </div>
