@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Schedule, ScheduleEntryType } from "@/types";
-import { projectedDateForIndex } from "@/lib/schedule-time";
+import { instanceDate } from "@/lib/schedule-time";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -63,13 +63,23 @@ export function ScheduleAssign({ storyUuid, typ, complete, onChanged }: Schedule
   }, [load]);
 
   const assignment = useMemo(
-    () => schedules.find((s) => s.queue.some((e) => e.storyUuid === storyUuid)) || null,
+    () => schedules.find((s) => s.slotInstances?.some((e) => e.storyUuid === storyUuid)) || null,
     [schedules, storyUuid],
   );
+  // Derived publish date of the assigned instance, or null when it is orphaned
+  // ("neu zuordnen" — slot deleted / never bound).
   const projected = useMemo(() => {
     if (!assignment) return null;
-    const index = assignment.queue.findIndex((e) => e.storyUuid === storyUuid);
-    return projectedDateForIndex(new Date(), assignment, index);
+    const inst = assignment.slotInstances.find((e) => e.storyUuid === storyUuid);
+    if (!inst || !inst.slotId) return null;
+    const slot = assignment.slots.find((sl) => sl.id === inst.slotId);
+    if (!slot) return null;
+    return instanceDate(slot, inst.weekStart, assignment.timezone || "Europe/Berlin");
+  }, [assignment, storyUuid]);
+  const orphanAssignment = useMemo(() => {
+    if (!assignment) return false;
+    const inst = assignment.slotInstances.find((e) => e.storyUuid === storyUuid);
+    return !!inst && (!inst.slotId || !assignment.slots.some((sl) => sl.id === inst.slotId));
   }, [assignment, storyUuid]);
 
   const assign = async () => {
@@ -137,9 +147,11 @@ export function ScheduleAssign({ storyUuid, typ, complete, onChanged }: Schedule
           <CalendarClock className="h-4 w-4 text-blue-400" />
           <span>
             Geplant: <span className="font-medium">{assignment.name}</span>
-            {projected && (
+            {projected ? (
               <span className="text-muted-foreground"> · {formatSlot(projected, assignment.timezone || "Europe/Berlin")}</span>
-            )}
+            ) : orphanAssignment ? (
+              <span className="text-orange-400"> · neu zuordnen</span>
+            ) : null}
           </span>
         </div>
         <Button

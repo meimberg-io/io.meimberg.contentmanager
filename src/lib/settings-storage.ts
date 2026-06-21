@@ -4,6 +4,7 @@
  */
 
 import { getSystemConfig, updateSystemConfig } from './system-config'
+import { normalizeSchedules } from './scheduler/normalize'
 import type { Schedule } from '@/types'
 
 export interface AiPrompts {
@@ -189,16 +190,55 @@ Sprache: Deutsch.`,
 }
 
 /**
- * Get settings from system config
+ * Get settings from system config. `schedules` are normalized to the SlotInstance
+ * model on the way out (MICM-32) — the single chokepoint that feeds the tick, both
+ * schedule routes, ScheduleAssign and mcp-posts, so every reader sees the new shape.
  */
 export async function getSettings(options?: { fresh?: boolean }): Promise<Settings> {
   try {
     const config = await getSystemConfig(options)
-    return config.settings || {}
+    const settings = config.settings || {}
+    return { ...settings, schedules: normalizeSchedules(settings.schedules) }
   } catch (error) {
     console.error('Failed to get settings:', error)
     return {}
   }
+}
+
+/**
+ * Save schedule *templates* (id/name/timezone/slots) from the Settings editor while
+ * PRESERVING each schedule's live `slotInstances` from a fresh read (MICM-32).
+ *
+ * The editor holds a stale snapshot for as long as the user has the page open; a
+ * blind full-array write would clobber instance status updates a tick made in the
+ * meantime, and a slot edit must move its instances (not drop them). Merging by
+ * schedule id keeps instances authoritative on the server side.
+ */
+export async function saveScheduleTemplates(
+  incoming: Array<Pick<Schedule, 'id' | 'name' | 'timezone'> & { slots?: Schedule['slots'] }>,
+): Promise<Schedule[]> {
+  const settings = await getSettings({ fresh: true })
+  const existing = Array.isArray(settings.schedules) ? settings.schedules : []
+  const byId = new Map(existing.map((s) => [s.id, s]))
+
+  const merged: Schedule[] = incoming.map((t) => {
+    const prev = byId.get(t.id)
+    return {
+      id: t.id,
+      name: t.name,
+      timezone: t.timezone || SCHEDULE_DEFAULT_TIMEZONE,
+      slots: (t.slots || []).map((sl) => ({
+        id: sl.id || `slot-${sl.weekday}-${sl.time}`,
+        weekday: sl.weekday,
+        time: sl.time,
+      })),
+      // Live instances are owned by the engine/routes, never by the editor.
+      slotInstances: prev ? prev.slotInstances : [],
+    }
+  })
+
+  await updateSettings({ schedules: merged })
+  return merged
 }
 
 /**

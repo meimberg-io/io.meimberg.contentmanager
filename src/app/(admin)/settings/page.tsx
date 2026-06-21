@@ -41,7 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Schedule, ScheduleSlot } from "@/types";
+import type { Schedule, Slot } from "@/types";
 
 // Must match DEFAULT_PROMPTS in settings-storage.ts
 const DEFAULT_PROMPTS: Record<string, string> = {
@@ -169,7 +169,7 @@ const timeToMinutes = (t: string): number => {
   return (h || 0) * 60 + (m || 0);
 };
 // Sort key: Monday-first weekday, then time-of-day.
-const slotSortKey = (s: ScheduleSlot): number => ((s.weekday + 6) % 7) * 10000 + timeToMinutes(s.time);
+const slotSortKey = (s: Slot): number => ((s.weekday + 6) % 7) * 10000 + timeToMinutes(s.time);
 const weekdayLabel = (w: number): string => WEEKDAYS.find((d) => d.value === w)?.label ?? String(w);
 
 /** Returns a human-readable error message if the schedules are invalid, else null. */
@@ -336,9 +336,12 @@ export default function SettingsPage() {
             aiPrompts: prompts,
             notes,
             publerLabels: publerLabels.map((l) => l.trim()).filter(Boolean),
+            // Template only (id/name/timezone/slots) — the server preserves each
+            // schedule's live slotInstances on merge (MICM-32).
             schedules: schedules.map((s) => ({
-              ...s,
+              id: s.id,
               name: s.name.trim(),
+              timezone: s.timezone,
               slots: [...s.slots].sort((a, b) => slotSortKey(a) - slotSortKey(b)),
             })),
           }
@@ -392,7 +395,7 @@ export default function SettingsPage() {
   const addSchedule = () =>
     setSchedules((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), name: `Schedule ${prev.length + 1}`, timezone: SCHEDULE_TIMEZONE, slots: [], queue: [], lastFiredAt: null },
+      { id: crypto.randomUUID(), name: `Schedule ${prev.length + 1}`, timezone: SCHEDULE_TIMEZONE, slots: [], slotInstances: [] },
     ]);
   const renameSchedule = (id: string, name: string) =>
     setSchedules((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
@@ -401,10 +404,12 @@ export default function SettingsPage() {
     setScheduleToDelete(null);
   };
   const addSlot = (id: string) =>
-    setSchedules((prev) => prev.map((s) => (s.id === id ? { ...s, slots: [...s.slots, { weekday: 1, time: "10:00" }] } : s)));
+    setSchedules((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, slots: [...s.slots, { id: crypto.randomUUID(), weekday: 1, time: "10:00" }] } : s)),
+    );
   const removeSlot = (id: string, idx: number) =>
     setSchedules((prev) => prev.map((s) => (s.id === id ? { ...s, slots: s.slots.filter((_, i) => i !== idx) } : s)));
-  const setSlot = (id: string, idx: number, patch: Partial<ScheduleSlot>) =>
+  const setSlot = (id: string, idx: number, patch: Partial<Slot>) =>
     setSchedules((prev) =>
       prev.map((s) => (s.id === id ? { ...s, slots: s.slots.map((sl, i) => (i === idx ? { ...sl, ...patch } : sl)) } : s))
     );
@@ -941,7 +946,7 @@ export default function SettingsPage() {
             <AlertDialogDescription>
               {(() => {
                 const s = schedules.find((x) => x.id === scheduleToDelete);
-                const n = s?.queue.length ?? 0;
+                const n = s?.slotInstances.length ?? 0;
                 if (n > 0) {
                   return `„${s?.name}" enthält ${n} eingeplante${n === 1 ? "n" : ""} Beitrag${n === 1 ? "" : "e"}. Beim Löschen werden diese nur aus dem Plan genommen und bleiben unveröffentlichte Entwürfe.`;
                 }

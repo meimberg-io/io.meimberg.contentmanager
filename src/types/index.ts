@@ -152,24 +152,42 @@ export interface ActivityItem {
   status: 'success' | 'warning' | 'error' | 'info';
 }
 
-// ── Scheduler (MICM-14) ──────────────────────────────────────────────────────
-/** What kind of story a queue entry points at. */
+// ── Scheduler (MICM-14, relational model MICM-32) ────────────────────────────
+/** What kind of story a slot instance points at. */
 export type ScheduleEntryType = 'blog' | 'article' | 'linkedin'
 
 /**
- * A recurring weekly publishing slot.
- * `weekday` follows the JS `Date.getDay()` convention: 0 = Sonntag … 6 = Samstag.
- * `time` is "HH:MM" (24h), interpreted in the schedule's `timezone`.
+ * A recurring weekly publishing slot — the *template* ("Mittwoch 10:00"), not a
+ * concrete date (MICM-32). `weekday` follows the JS `Date.getDay()` convention:
+ * 0 = Sonntag … 6 = Samstag. `time` is "HH:MM" (24h), interpreted in the
+ * schedule's `timezone`. `id` is stable so instances can reference it across
+ * weekday/time edits.
  */
-export interface ScheduleSlot {
+export interface Slot {
+  id: string;
   weekday: number;
   time: string;
 }
 
-/** One queued item waiting to be published into the schedule's next free slot. */
-export interface ScheduleQueueEntry {
+/** Lifecycle of a slot instance (MICM-32). */
+export type SlotInstanceStatus = 'pending' | 'published' | 'failed' | 'skipped'
+
+/**
+ * A post bound to a concrete week of a slot (MICM-32). The concrete publish
+ * date/time is *derived* from `slot.weekday + slot.time + weekStart` in the
+ * schedule's timezone — never frozen, so editing the slot moves all its
+ * instances automatically. Only occupied/fired instances are persisted; empty
+ * slots are derived from the template × weeks in the display horizon.
+ */
+export interface SlotInstance {
+  id: string;
+  /** FK into `Schedule.slots`. `null` (or a non-existent id) = orphaned → "neu zuordnen". */
+  slotId: string | null;
+  /** Monday date of the week ("YYYY-MM-DD"). Deliberately not ISO calendar weeks. */
+  weekStart: string;
   storyUuid: string;
   typ: ScheduleEntryType;
+  status: SlotInstanceStatus;
   /** Consecutive technical publish failures (MICM-20). */
   errorCount?: number;
   /** Last technical error message (MICM-20). */
@@ -179,20 +197,17 @@ export interface ScheduleQueueEntry {
 }
 
 /**
- * A publishing schedule: a set of recurring weekly slots plus an ordered queue
- * of posts that drain into those slots (MICM-14). Stored in the app config
- * (`contentmanager_config` → settings.schedules), not in a Storyblok component.
+ * A publishing schedule: a named editorial track of recurring weekly slots plus
+ * the slot instances that bind posts to concrete weeks (MICM-14 / MICM-32).
+ * Stored in the app config (`contentmanager_config` → settings.schedules), not in
+ * a Storyblok component.
  */
 export interface Schedule {
   id: string;
   name: string;
   /** IANA timezone; currently fixed to "Europe/Berlin" (no UI selection, MICM-15). */
   timezone: string;
-  slots: ScheduleSlot[];
-  /** Ordered publishing queue; head goes out first. Empty until MICM-18. */
-  queue: ScheduleQueueEntry[];
-  /** ISO timestamp of the most recently processed slot occurrence; null = never fired. Set by the engine (MICM-17). */
-  lastFiredAt: string | null;
-  /** Entries pulled out of the queue after repeated failures — need user attention (MICM-20). */
-  sidelined?: ScheduleQueueEntry[];
+  slots: Slot[];
+  /** Posts bound to concrete weeks. Only occupied/fired instances persist (MICM-32). */
+  slotInstances: SlotInstance[];
 }

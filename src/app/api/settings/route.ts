@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-guard'
-import { getSettings, updateSettings } from '@/lib/settings-storage'
+import { getSettings, updateSettings, saveScheduleTemplates } from '@/lib/settings-storage'
 
 /**
  * GET /api/settings
@@ -36,16 +36,23 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json()
     const { settings } = body
-    
+
     if (!settings) {
       return NextResponse.json(
         { error: 'settings object is required' },
         { status: 400 }
       )
     }
-    
-    const updatedSettings = await updateSettings(settings)
-    
+
+    // Schedules are template-only from the editor: merge them server-side so live
+    // slotInstances are preserved (MICM-32), never round-tripped from the stale client.
+    const { schedules, ...rest } = settings
+    let updatedSettings = await updateSettings(rest)
+    if (Array.isArray(schedules)) {
+      const merged = await saveScheduleTemplates(schedules)
+      updatedSettings = { ...updatedSettings, schedules: merged }
+    }
+
     return NextResponse.json({ settings: updatedSettings })
   } catch (error: any) {
     console.error('Update settings error:', error)

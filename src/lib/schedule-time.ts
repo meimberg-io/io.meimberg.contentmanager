@@ -1,14 +1,21 @@
 /**
- * Schedule time math (MICM-14) — pure and client-safe (only `Intl`, no server imports).
+ * Schedule time math (MICM-14 / MICM-32) — pure and client-safe (only `Intl`, no
+ * server imports).
  *
- * Shared by the scheduler engine (backward: which slot is due now) and the UI
- * (forward: projected publish dates for the queue). All slot times are interpreted
- * in the schedule's IANA timezone, DST-correct.
+ * Concrete publish dates are *derived* from `slot.weekday + slot.time + weekStart`
+ * in the schedule's IANA timezone (DST-correct). There is no frozen date and no
+ * queue-position projection anymore — `instanceDate` is the single source of truth
+ * for "when does this instance go out", shared by the engine, the routes and the UI.
  */
 
-import type { Schedule } from '@/types'
+import type { Schedule, Slot } from '@/types'
 
 const DEFAULT_TZ = 'Europe/Berlin'
+
+/** How many weeks ahead the editorial plan + auto-assign consider (MICM-32). */
+export const SCHEDULE_HORIZON_WEEKS = 8
+
+const pad2 = (n: number): string => String(n).padStart(2, '0')
 
 // JS getDay(): 0 = Sunday … 6 = Saturday.
 const WEEKDAY_INDEX: Record<string, number> = {
@@ -75,65 +82,91 @@ function zonedWallClockToUtc(
 }
 
 /**
- * The most recent slot occurrence at or before `now`, across all weekly slots.
- * Returns null if the schedule has no slots.
+ * ISO date ("YYYY-MM-DD") of the Monday of the week `instant` falls in, in `tz`.
+ * Monday-first (not ISO calendar weeks — deliberate, MICM-32). JS getDay() has
+ * Sunday = 0, so it is remapped to ISO (Mon = 1 … Sun = 7) before stepping back.
  */
-export function latestOccurrence(now: Date, schedule: Pick<Schedule, 'slots' | 'timezone'>): Date | null {
-  const tz = schedule.timezone || DEFAULT_TZ
-  if (!schedule.slots?.length) return null
+export function weekStartOf(instant: Date, timeZone: string = DEFAULT_TZ): string {
+  const p = zonedParts(instant, timeZone)
+  const isoDow = p.weekday === 0 ? 7 : p.weekday
+  const back = isoDow - 1
+  // Step whole days from the local-noon anchor so DST (23h/25h) never crosses a date.
+  const anchorNoonUtc = Date.UTC(p.year, p.month - 1, p.day, 12, 0, 0)
+  const monday = zonedParts(new Date(anchorNoonUtc - back * 86_400_000), timeZone)
+  return `${monday.year}-${pad2(monday.month)}-${pad2(monday.day)}`
+}
 
-  const bn = zonedParts(now, tz)
-  // Anchor at local noon "today" so day-by-day iteration stays on stable calendar days.
-  const anchor = Date.UTC(bn.year, bn.month - 1, bn.day, 12, 0, 0)
-
-  let best: number | null = null
-  for (const slot of schedule.slots) {
-    const [h, m] = slot.time.split(':').map(Number)
-    for (let dayBack = 0; dayBack <= 7; dayBack++) {
-      const dp = zonedParts(new Date(anchor - dayBack * 86_400_000), tz)
-      if (dp.weekday !== slot.weekday) continue
-      const occ = zonedWallClockToUtc(dp.year, dp.month, dp.day, h || 0, m || 0, tz).getTime()
-      if (occ <= now.getTime()) {
-        if (best === null || occ > best) best = occ
-        break // most recent occurrence for this slot found
-      }
-    }
-  }
-  return best === null ? null : new Date(best)
+/** The `weekStart` (Monday "YYYY-MM-DD") that is `weeks` weeks after the given one. */
+function addWeeks(weekStart: string, weeks: number, timeZone: string): string {
+  const [y, mo, d] = weekStart.split('-').map(Number)
+  const noonUtc = Date.UTC(y, mo - 1, d, 12, 0, 0)
+  return weekStartOf(new Date(noonUtc + weeks * 7 * 86_400_000), timeZone)
 }
 
 /**
- * The next `count` slot occurrences strictly after `now`, ascending. Used to project
- * when queued posts will go out (queue index i → nextOccurrences[i]).
+ * The concrete UTC instant of `slot` (weekday + time) within the week beginning
+ * `weekStart`, in `tz` (DST-correct). The single source of truth for an instance's
+ * publish date — every caller (engine, routes, UI) goes through here, never re-deriving.
  */
-export function nextOccurrences(now: Date, schedule: Pick<Schedule, 'slots' | 'timezone'>, count: number): Date[] {
-  const tz = schedule.timezone || DEFAULT_TZ
-  if (!schedule.slots?.length || count <= 0) return []
-
-  const bn = zonedParts(now, tz)
-  const anchor = Date.UTC(bn.year, bn.month - 1, bn.day, 12, 0, 0)
-  const maxDays = Math.min(366, (count + 2) * 7)
-
-  const found: number[] = []
-  for (let dayFwd = 0; dayFwd <= maxDays; dayFwd++) {
-    const dp = zonedParts(new Date(anchor + dayFwd * 86_400_000), tz)
-    for (const slot of schedule.slots) {
-      if (dp.weekday !== slot.weekday) continue
-      const [h, m] = slot.time.split(':').map(Number)
-      const occ = zonedWallClockToUtc(dp.year, dp.month, dp.day, h || 0, m || 0, tz).getTime()
-      if (occ > now.getTime()) found.push(occ)
-    }
-  }
-  found.sort((a, b) => a - b)
-  const uniq = found.filter((v, i) => i === 0 || v !== found[i - 1])
-  return uniq.slice(0, count).map((t) => new Date(t))
+export function instanceDate(
+  slot: Pick<Slot, 'weekday' | 'time'>,
+  weekStart: string,
+  timeZone: string = DEFAULT_TZ,
+): Date {
+  const [y, mo, d] = weekStart.split('-').map(Number)
+  const [h, m] = slot.time.split(':').map(Number)
+  const isoTargetDow = slot.weekday === 0 ? 7 : slot.weekday
+  // Re-derive the target day's Y/M/D in tz (it can cross a month/DST boundary),
+  // then build the real instant from its wall-clock time.
+  const mondayNoonUtc = Date.UTC(y, mo - 1, d, 12, 0, 0)
+  const dayParts = zonedParts(new Date(mondayNoonUtc + (isoTargetDow - 1) * 86_400_000), timeZone)
+  return zonedWallClockToUtc(dayParts.year, dayParts.month, dayParts.day, h || 0, m || 0, timeZone)
 }
 
-/** Projected publish date for the entry at queue position `index` (0 = next slot). */
-export function projectedDateForIndex(now: Date, schedule: Pick<Schedule, 'slots' | 'timezone'>, index: number): Date | null {
-  if (index < 0) return null
-  const occ = nextOccurrences(now, schedule, index + 1)
-  return occ[index] ?? null
+/**
+ * Every template slot × every week in `[thisWeek .. +horizonWeeks)` as derived
+ * rows, ascending by date. Empty + occupied alike — the caller subtracts what is
+ * already occupied. Used by the editorial-plan grid and auto-assign.
+ */
+export function deriveUpcomingSlots(
+  schedule: Pick<Schedule, 'slots' | 'timezone'>,
+  now: Date,
+  horizonWeeks: number = SCHEDULE_HORIZON_WEEKS,
+): { slotId: string; weekStart: string; date: Date }[] {
+  const tz = schedule.timezone || DEFAULT_TZ
+  if (!schedule.slots?.length || horizonWeeks <= 0) return []
+  const base = weekStartOf(now, tz)
+  const out: { slotId: string; weekStart: string; date: Date }[] = []
+  for (let w = 0; w < horizonWeeks; w++) {
+    const weekStart = addWeeks(base, w, tz)
+    for (const slot of schedule.slots) {
+      out.push({ slotId: slot.id, weekStart, date: instanceDate(slot, weekStart, tz) })
+    }
+  }
+  out.sort((a, b) => a.date.getTime() - b.date.getTime())
+  return out
+}
+
+/**
+ * The first derived slot strictly after `now` not occupied by a live instance
+ * (`pending` or `failed` — both hold the slot). null if the horizon is full.
+ */
+export function nextFreeFutureSlot(
+  schedule: Pick<Schedule, 'slots' | 'timezone' | 'slotInstances'>,
+  now: Date,
+  horizonWeeks: number = SCHEDULE_HORIZON_WEEKS,
+): { slotId: string; weekStart: string; date: Date } | null {
+  const occupied = new Set(
+    (schedule.slotInstances || [])
+      .filter((i) => i.status === 'pending' || i.status === 'failed')
+      .map((i) => `${i.slotId}__${i.weekStart}`),
+  )
+  for (const s of deriveUpcomingSlots(schedule, now, horizonWeeks)) {
+    if (s.date.getTime() <= now.getTime()) continue
+    if (occupied.has(`${s.slotId}__${s.weekStart}`)) continue
+    return s
+  }
+  return null
 }
 
 /** Format an instant as "YYYY-MM-DD" in the given timezone (matches the blog `date` field). */

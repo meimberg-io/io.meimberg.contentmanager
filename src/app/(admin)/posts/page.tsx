@@ -40,7 +40,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
-import { projectedDateForIndex, ymdInZone } from "@/lib/schedule-time";
+import { ymdInZone } from "@/lib/schedule-time";
 import { toast } from "@/hooks/use-toast";
 
 // Multi-state filter
@@ -267,16 +267,16 @@ function AllPostsPageContent() {
         const transformedPosts = (data.posts || []).map(transformStoryblokBlog);
         setPosts(transformedPosts);
 
-        // Map storyUuid -> projected publish date for scheduled posts (MICM-30).
+        // Map storyUuid -> derived slot publish date for scheduled posts (MICM-30/32).
         if (scheduleRes && scheduleRes.ok) {
           const sched = await scheduleRes.json();
-          const now = new Date();
           const map: Record<string, string> = {};
           for (const s of sched.schedules || []) {
-            (s.entries || []).forEach((e: { storyUuid: string }, i: number) => {
-              const at = projectedDateForIndex(now, s, i);
-              if (at) map[e.storyUuid] = ymdInZone(at, s.timezone || 'Europe/Berlin');
-            });
+            for (const inst of s.instances || []) {
+              if (inst.status === 'pending' && !inst.isOrphan && inst.date) {
+                map[inst.storyUuid] = ymdInZone(new Date(inst.date), s.timezone || 'Europe/Berlin');
+              }
+            }
           }
           setScheduledMap(map);
         }

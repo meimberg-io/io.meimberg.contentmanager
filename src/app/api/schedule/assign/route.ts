@@ -3,10 +3,13 @@ import { requireAuth } from '@/lib/auth-guard'
 import { getSettings, updateSettings } from '@/lib/settings-storage'
 import { resolveBlogStoryByUuid } from '@/lib/storyblok-management'
 import { fetchLinkedinPostsByBlogUuid } from '@/lib/storyblok'
+import { nextFreeFutureSlot, instanceDate, weekStartOf } from '@/lib/schedule-time'
 import type { Schedule, ScheduleEntryType } from '@/types'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const DEFAULT_TZ = 'Europe/Berlin'
 
 /** True if the story (any component) is marked content-complete. */
 async function isComplete(uuid: string): Promise<boolean> {
@@ -15,10 +18,12 @@ async function isComplete(uuid: string): Promise<boolean> {
 }
 
 /**
- * POST /api/schedule/assign — add a post to a schedule's queue (MICM-18).
- * Body: { storyUuid, typ, scheduleId }. Content-complete gate: the post (and, for a
- * coupled blog, every attached LinkedIn post) must be content-complete. A post lives
- * in at most one queue, so it is first removed from any other schedule.
+ * POST /api/schedule/assign — bind a post to a schedule's slot (MICM-18 / MICM-32).
+ * Body: { storyUuid, typ, scheduleId, slotId?, weekStart? }. Content-complete gate: the
+ * post (and, for a coupled blog, every attached LinkedIn post) must be content-complete.
+ * Without slotId/weekStart the next free future slot is auto-picked; with both, the slot
+ * is validated and used. A post lives in at most one instance, so it is first removed
+ * from every schedule.
  */
 export async function POST(request: Request) {
   try {
@@ -28,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { storyUuid, typ, scheduleId } = await request.json()
+    const { storyUuid, typ, scheduleId, slotId, weekStart } = await request.json()
     if (!storyUuid || !typ || !scheduleId) {
       return NextResponse.json({ error: 'storyUuid, typ und scheduleId sind erforderlich' }, { status: 400 })
     }
@@ -56,10 +61,45 @@ export async function POST(request: Request) {
 
     const target = schedules.find((s) => s.id === scheduleId)
     if (!target) return NextResponse.json({ error: 'Schedule nicht gefunden' }, { status: 404 })
+    const tz = target.timezone || DEFAULT_TZ
 
-    // A post lives in at most one queue: drop it everywhere, then append to target.
-    for (const s of schedules) s.queue = s.queue.filter((e) => e.storyUuid !== storyUuid)
-    target.queue.push({ storyUuid, typ: typ as ScheduleEntryType })
+    // A post lives in at most one instance: drop it everywhere, then bind to target.
+    for (const s of schedules) s.slotInstances = s.slotInstances.filter((i) => i.storyUuid !== storyUuid)
+
+    let chosenSlotId: string
+    let chosenWeekStart: string
+
+    if (slotId && weekStart) {
+      // Manual override: validate the slot exists and weekStart is a real Monday.
+      const slot = target.slots.find((s) => s.id === slotId)
+      if (!slot) return NextResponse.json({ error: 'Slot nicht gefunden' }, { status: 400 })
+      if (weekStartOf(instanceDate(slot, weekStart, tz), tz) !== weekStart) {
+        return NextResponse.json({ error: 'weekStart muss ein Montagsdatum (YYYY-MM-DD) sein' }, { status: 400 })
+      }
+      const occupied = target.slotInstances.some(
+        (i) => i.slotId === slotId && i.weekStart === weekStart && (i.status === 'pending' || i.status === 'failed'),
+      )
+      if (occupied) return NextResponse.json({ error: 'Slot ist bereits belegt' }, { status: 409 })
+      chosenSlotId = slotId
+      chosenWeekStart = weekStart
+    } else {
+      // Auto: next free future slot of the track.
+      const free = nextFreeFutureSlot(target, new Date())
+      if (!free) {
+        return NextResponse.json({ error: 'Kein freier Slot im Planungshorizont' }, { status: 409 })
+      }
+      chosenSlotId = free.slotId
+      chosenWeekStart = free.weekStart
+    }
+
+    target.slotInstances.push({
+      id: crypto.randomUUID(),
+      slotId: chosenSlotId,
+      weekStart: chosenWeekStart,
+      storyUuid,
+      typ: typ as ScheduleEntryType,
+      status: 'pending',
+    })
 
     await updateSettings({ schedules })
     return NextResponse.json({ ok: true, scheduleId: target.id })
@@ -70,8 +110,9 @@ export async function POST(request: Request) {
 }
 
 /**
- * DELETE /api/schedule/assign — remove a post from any schedule queue (MICM-18).
- * Body: { storyUuid }. The post stays an unchanged draft.
+ * DELETE /api/schedule/assign — remove a post's instance from any schedule (MICM-18 /
+ * MICM-32). Body: { storyUuid }. Drops orphaned ("neu zuordnen") instances too. The
+ * post stays an unchanged draft.
  */
 export async function DELETE(request: Request) {
   try {
@@ -91,12 +132,9 @@ export async function DELETE(request: Request) {
 
     let removed = false
     for (const s of schedules) {
-      const beforeQ = s.queue.length
-      s.queue = s.queue.filter((e) => e.storyUuid !== storyUuid)
-      // Also clear it from the sidelined ("Fehler/zu prüfen") bucket (MICM-20).
-      const beforeS = s.sidelined?.length ?? 0
-      if (s.sidelined) s.sidelined = s.sidelined.filter((e) => e.storyUuid !== storyUuid)
-      if (s.queue.length !== beforeQ || (s.sidelined?.length ?? 0) !== beforeS) removed = true
+      const before = s.slotInstances.length
+      s.slotInstances = s.slotInstances.filter((i) => i.storyUuid !== storyUuid)
+      if (s.slotInstances.length !== before) removed = true
     }
 
     if (removed) await updateSettings({ schedules })

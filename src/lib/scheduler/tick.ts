@@ -1,46 +1,51 @@
 /**
- * Scheduler tick engine (MICM-17 + MICM-20 robustness).
+ * Scheduler tick engine (MICM-17 + MICM-20 robustness; MICM-32 instance model).
  *
  * Pure, session-free logic that the cron endpoint (MICM-16) and the admin
- * "run now" button call. Per schedule it finds the most recent due slot
- * (Europe/Berlin, DST-correct, via schedule-time), and if the queue is non-empty
- * publishes the queue head, removes it, and advances `lastFiredAt`.
+ * "run now" button call. Per schedule it fires EVERY due slot instance — each at
+ * its OWN derived date — not "one per tick".
  *
- * Design decisions (Epic MICM-14):
- *  - Max 1 publish per schedule per tick.
- *  - "Gepaced fortsetzen": older missed slots are NOT replayed — only the most
- *    recent due slot is acted on, so an outage shifts the series, no burst.
- *  - Empty queue at a due slot → the slot lapses (lastFiredAt advances).
- *  - Coupled blog: publish the blog first, then fire its attached, content-complete
- *    LinkedIn posts (the 409 guard then passes because the blog is live).
+ * Design (MICM-32):
+ *  - Due = `slotInstances` with `status = pending`, bound to a current slot, whose
+ *    derived time (`instanceDate`) is <= now. Processed ascending by date.
+ *  - Idempotency is status-based: a published/failed/skipped instance is never
+ *    re-selected. No `lastFiredAt`, no `latestOccurrence` backdating.
+ *  - A missed slot (cron outage) fires on the next tick at its planned — possibly
+ *    past — derived date: deliberate, plan-based backdating, never onto "some" past slot.
+ *  - Orphaned instances (slot deleted / never bound) are skipped entirely — never
+ *    published, never silently dropped.
+ *  - Coupled blog: publish the blog first, then its attached, content-complete
+ *    LinkedIn posts (the 409 guard passes because the blog is live).
  *
  * Robustness (MICM-20):
- *  - Technical publish failure → keep the item at the head, increment errorCount,
- *    do NOT advance lastFiredAt → retried next tick. After RETRY_CAP consecutive
- *    failures the item is moved to `sidelined` and the schedule continues.
+ *  - Technical publish failure → keep the instance `pending`, increment errorCount;
+ *    after RETRY_CAP consecutive failures the instance becomes `failed`.
  *  - Partial coupled failure (blog live, an attached LinkedIn post fails) → the blog
- *    entry leaves the queue (blog is live), the failed LinkedIn post is sidelined.
- *  - Pruning: heads whose story was published manually or deleted are dropped.
+ *    instance is `published`; each failed LinkedIn post becomes an orphaned `failed`
+ *    instance ("neu zuordnen").
+ *  - Story published manually or deleted → instance `skipped`.
  *  - Read-modify-write against a FRESH config read to minimise clobbering concurrent
  *    UI edits (single-user tool — best-effort, no hard lock).
  */
 
-import type { Schedule, ScheduleQueueEntry } from '@/types'
+import type { Schedule, Slot, SlotInstance } from '@/types'
 import { getSettings, updateSettings } from '@/lib/settings-storage'
 import { publishPost, getStoryIdByUuid, resolveBlogStoryByUuid } from '@/lib/storyblok-management'
 import { fetchLinkedinPostsByBlogUuid } from '@/lib/storyblok'
 import { publishLinkedinNow } from '@/lib/linkedin-publish'
-import { latestOccurrence, ymdInZone } from '@/lib/schedule-time'
+import { instanceDate, ymdInZone } from '@/lib/schedule-time'
 
-/** Consecutive technical failures before an item is moved to the sidelined bucket. */
+/** Consecutive technical failures before an instance is marked failed. */
 const RETRY_CAP = 3
+
+const DEFAULT_TZ = 'Europe/Berlin'
 
 export interface TickEntryResult {
   scheduleId: string
   scheduleName: string
   fired: boolean
   occurrence?: string
-  entry?: ScheduleQueueEntry
+  entry?: SlotInstance
   ok?: boolean
   error?: string
   note?: string
@@ -55,9 +60,12 @@ type PublishOutcome =
   | { ok: true; failedAttached: { storyUuid: string; error: string }[] }
   | { ok: false; error: string }
 
+/** A target an instance points at — enough for publish + staleness checks. */
+type PublishTarget = Pick<SlotInstance, 'storyUuid' | 'typ'>
+
 /**
- * Run one scheduler tick. Idempotent: re-running within the same slot window does
- * nothing (guarded by `lastFiredAt`). Persists schedule changes once at the end.
+ * Run one scheduler tick. Idempotent via per-instance status. Persists schedule
+ * changes once at the end.
  */
 export async function runScheduleTick(now: Date = new Date()): Promise<TickResult> {
   // Fresh read so the read-modify-write below works against current data (MICM-20 AK6).
@@ -71,89 +79,98 @@ export async function runScheduleTick(now: Date = new Date()): Promise<TickResul
 
   for (const schedule of schedules) {
     const base = { scheduleId: schedule.id, scheduleName: schedule.name }
-    if (!Array.isArray(schedule.sidelined)) schedule.sidelined = []
+    const tz = schedule.timezone || DEFAULT_TZ
+    const slotById = new Map<string, Slot>(schedule.slots.map((s) => [s.id, s]))
 
-    const occ = latestOccurrence(now, schedule)
-    if (!occ) {
-      results.push({ ...base, fired: false, note: 'no due slot' })
+    // Due instances: pending, slot-bound (a missing slot = orphan → dropped here),
+    // derived time already reached. Ascending so each fires in plan order.
+    const due = schedule.slotInstances
+      .filter((i) => i.status === 'pending')
+      .map((i) => ({ inst: i, slot: i.slotId ? slotById.get(i.slotId) : undefined }))
+      .filter((x): x is { inst: SlotInstance; slot: Slot } => !!x.slot)
+      .map((x) => ({ inst: x.inst, date: instanceDate(x.slot, x.inst.weekStart, tz) }))
+      .filter((x) => x.date.getTime() <= now.getTime())
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+
+    if (due.length === 0) {
+      results.push({ ...base, fired: false, note: 'keine fällige Instanz' })
       continue
     }
 
-    const lastFired = schedule.lastFiredAt ? new Date(schedule.lastFiredAt).getTime() : 0
-    if (occ.getTime() <= lastFired) {
-      results.push({ ...base, fired: false, note: 'already processed' })
-      continue
-    }
+    for (const { inst, date } of due) {
+      const occIso = date.toISOString()
 
-    // Prune heads whose story was published manually or deleted (MICM-20 AK4).
-    if (await pruneStaleHeads(schedule)) changed = true
+      // Story published manually or deleted → skip (generalised pruneStaleHeads, MICM-20 AK4).
+      if (await isPublishedOrMissing(inst)) {
+        inst.status = 'skipped'
+        changed = true
+        results.push({ ...base, fired: false, occurrence: occIso, entry: inst, note: 'übersprungen (bereits veröffentlicht/gelöscht)' })
+        continue
+      }
 
-    if (schedule.queue.length === 0) {
-      schedule.lastFiredAt = occ.toISOString()
-      changed = true
-      results.push({ ...base, fired: false, occurrence: occ.toISOString(), note: 'queue empty, slot lapsed' })
-      continue
-    }
+      const outcome = await publishEntry(inst, date, tz)
 
-    const entry = schedule.queue[0]
-    const outcome = await publishEntry(entry, occ, schedule.timezone || 'Europe/Berlin')
-
-    if (outcome.ok) {
-      schedule.queue = schedule.queue.slice(1)
-      schedule.lastFiredAt = occ.toISOString()
-      changed = true
-      if (outcome.failedAttached.length > 0) {
-        for (const f of outcome.failedAttached) {
-          schedule.sidelined.push({
-            storyUuid: f.storyUuid,
-            typ: 'linkedin',
-            errorCount: RETRY_CAP,
-            lastError: f.error,
-            lastErrorAt: now.toISOString(),
+      if (outcome.ok) {
+        inst.status = 'published'
+        delete inst.errorCount
+        delete inst.lastError
+        delete inst.lastErrorAt
+        changed = true
+        if (outcome.failedAttached.length > 0) {
+          for (const f of outcome.failedAttached) {
+            schedule.slotInstances.push({
+              id: `orphan-${f.storyUuid}`,
+              slotId: null,
+              weekStart: inst.weekStart,
+              storyUuid: f.storyUuid,
+              typ: 'linkedin',
+              status: 'failed',
+              errorCount: RETRY_CAP,
+              lastError: f.error,
+              lastErrorAt: now.toISOString(),
+            })
+          }
+          results.push({
+            ...base,
+            fired: true,
+            occurrence: occIso,
+            entry: inst,
+            ok: true,
+            error: `Blog live, ${outcome.failedAttached.length} LinkedIn-Post(s) fehlgeschlagen → neu zuordnen`,
           })
+        } else {
+          results.push({ ...base, fired: true, occurrence: occIso, entry: inst, ok: true })
         }
+        continue
+      }
+
+      // Technical failure → retry next tick up to RETRY_CAP, then mark failed (MICM-20 AK1/AK2).
+      inst.errorCount = (inst.errorCount || 0) + 1
+      inst.lastError = outcome.error
+      inst.lastErrorAt = now.toISOString()
+      changed = true
+
+      if (inst.errorCount >= RETRY_CAP) {
+        inst.status = 'failed'
         results.push({
           ...base,
-          fired: true,
-          occurrence: occ.toISOString(),
-          entry,
-          ok: true,
-          error: `Blog live, ${outcome.failedAttached.length} LinkedIn-Post(s) fehlgeschlagen → beiseitegelegt`,
+          fired: false,
+          occurrence: occIso,
+          entry: inst,
+          ok: false,
+          error: `${outcome.error} (Cap erreicht → fehlgeschlagen)`,
         })
       } else {
-        results.push({ ...base, fired: true, occurrence: occ.toISOString(), entry, ok: true })
+        // Leave pending → retried next tick.
+        results.push({
+          ...base,
+          fired: false,
+          occurrence: occIso,
+          entry: inst,
+          ok: false,
+          error: `${outcome.error} (Versuch ${inst.errorCount}/${RETRY_CAP})`,
+        })
       }
-      continue
-    }
-
-    // Technical failure → retry next tick up to RETRY_CAP, then sideline (MICM-20 AK1/AK2).
-    entry.errorCount = (entry.errorCount || 0) + 1
-    entry.lastError = outcome.error
-    entry.lastErrorAt = now.toISOString()
-    changed = true
-
-    if (entry.errorCount >= RETRY_CAP) {
-      schedule.queue = schedule.queue.slice(1)
-      schedule.sidelined.push(entry)
-      schedule.lastFiredAt = occ.toISOString()
-      results.push({
-        ...base,
-        fired: false,
-        occurrence: occ.toISOString(),
-        entry,
-        ok: false,
-        error: `${outcome.error} (Cap erreicht → beiseitegelegt)`,
-      })
-    } else {
-      // Leave at head; do NOT advance lastFiredAt → retried next tick.
-      results.push({
-        ...base,
-        fired: false,
-        occurrence: occ.toISOString(),
-        entry,
-        ok: false,
-        error: `${outcome.error} (Versuch ${entry.errorCount}/${RETRY_CAP})`,
-      })
     }
   }
 
@@ -161,37 +178,27 @@ export async function runScheduleTick(now: Date = new Date()): Promise<TickResul
   return { ranAt: now.toISOString(), results }
 }
 
-/** Drop queue heads whose story is already published or deleted (MICM-20 AK4). */
-async function pruneStaleHeads(schedule: Schedule): Promise<boolean> {
-  let pruned = false
-  while (schedule.queue.length > 0) {
-    if (!(await isPublishedOrMissing(schedule.queue[0]))) break
-    schedule.queue = schedule.queue.slice(1)
-    pruned = true
-  }
-  return pruned
-}
-
-async function isPublishedOrMissing(entry: ScheduleQueueEntry): Promise<boolean> {
+/** True if the instance's story is already published or deleted (MICM-20 AK4). */
+async function isPublishedOrMissing(entry: PublishTarget): Promise<boolean> {
   try {
     const story = await resolveBlogStoryByUuid(entry.storyUuid)
     if (!story) return true // deleted
     const c = story.content || {}
     if (entry.typ === 'linkedin') return !!c.cm_publer_published_at
     // `published` only: a story unpublished after a prior publish keeps published_at
-    // set, but is NOT live — it must stay queued so the scheduler re-publishes it.
+    // set, but is NOT live — it must stay schedulable so the engine re-publishes it.
     return story.published === true
   } catch {
-    return false // on resolve error keep the entry (safer than dropping)
+    return false // on resolve error keep the instance (safer than dropping)
   }
 }
 
 /**
- * Publish one queue entry. For a blog/article, publishes the story and then fires
- * its attached, content-complete LinkedIn posts in the same slot (coupling, MICM-14).
- * Returns an outcome rather than throwing so the caller can apply retry/sideline.
+ * Publish one instance's story. For a blog/article, publishes the story and then
+ * fires its attached, content-complete LinkedIn posts in the same slot (coupling,
+ * MICM-14). Returns an outcome rather than throwing so the caller can retry/mark failed.
  */
-async function publishEntry(entry: ScheduleQueueEntry, occ: Date, tz: string): Promise<PublishOutcome> {
+async function publishEntry(entry: PublishTarget, occ: Date, tz: string): Promise<PublishOutcome> {
   let numericId: number | null
   try {
     numericId = await getStoryIdByUuid(entry.storyUuid)
@@ -231,7 +238,7 @@ async function publishEntry(entry: ScheduleQueueEntry, occ: Date, tz: string): P
       }
     }
   } catch {
-    // Couldn't list attached posts — the blog is live, so don't fail the entry.
+    // Couldn't list attached posts — the blog is live, so don't fail the instance.
   }
   return { ok: true, failedAttached }
 }

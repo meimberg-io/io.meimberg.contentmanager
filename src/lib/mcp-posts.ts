@@ -15,7 +15,7 @@ import {
 } from './storyblok-management'
 import { transformStoryblokBlog, transformStoryblokLinkedin } from './transform-storyblok'
 import { getSettings } from './settings-storage'
-import { projectedDateForIndex, ymdInZone } from './schedule-time'
+import { instanceDate, ymdInZone } from './schedule-time'
 import type { Schedule } from '@/types'
 
 const SCHEDULE_DEFAULT_TZ = 'Europe/Berlin'
@@ -38,9 +38,9 @@ export interface PostListEntry {
   contentComplete: { confirmed: boolean; color: 'green' | 'yellow' | 'red' | 'gray' }
   /** Blog/Article: Storyblok publish state. LinkedIn: Publer publish state. */
   published: { isPublished: boolean; publishedAt: string | null; hasUnpublishedChanges: boolean }
-  /** True if the story sits in any scheduler queue (matches the "Geplant" list state, MICM-30). */
+  /** True if the story has a pending, slot-bound instance (the "Geplant" list state, MICM-30/32). */
   scheduled: boolean
-  /** Projected publish date (YYYY-MM-DD) when scheduled; null otherwise. */
+  /** Derived slot publish date (YYYY-MM-DD) when scheduled; null otherwise. */
   scheduledFor: string | null
   date: string
   createdAt: string
@@ -86,21 +86,23 @@ function typeOf(story: any): PostType {
 }
 
 /**
- * storyUuid -> projected publish date for every queued story, across all
- * schedules. Mirrors the Posts-list "Geplant" mapping (MICM-30): queue position
- * i projects to the i-th upcoming slot. Sidelined entries are not "scheduled".
+ * storyUuid -> derived publish date for every pending, slot-bound instance across
+ * all schedules (MICM-30/32). Orphaned ("neu zuordnen") and already-fired/failed
+ * instances are not "scheduled".
  */
 async function buildScheduledMap(): Promise<Map<string, string | null>> {
   const settings = await getSettings()
   const schedules: Schedule[] = Array.isArray(settings.schedules) ? settings.schedules : []
-  const now = new Date()
   const map = new Map<string, string | null>()
   for (const schedule of schedules) {
-    ;(schedule.queue || []).forEach((entry, index) => {
-      if (!entry?.storyUuid) return
-      const at = projectedDateForIndex(now, schedule, index)
-      map.set(entry.storyUuid, at ? ymdInZone(at, schedule.timezone || SCHEDULE_DEFAULT_TZ) : null)
-    })
+    const tz = schedule.timezone || SCHEDULE_DEFAULT_TZ
+    const slotById = new Map(schedule.slots.map((s) => [s.id, s]))
+    for (const inst of schedule.slotInstances) {
+      if (inst.status !== 'pending') continue
+      const slot = inst.slotId ? slotById.get(inst.slotId) : undefined
+      if (!slot) continue // orphan — not "geplant" with a date
+      map.set(inst.storyUuid, ymdInZone(instanceDate(slot, inst.weekStart, tz), tz))
+    }
   }
   return map
 }
