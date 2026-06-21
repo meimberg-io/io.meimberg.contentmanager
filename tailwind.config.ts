@@ -56,6 +56,7 @@ export default {
           yellow: "hsl(var(--status-yellow))",
           red: "hsl(var(--status-red))",
           gray: "hsl(var(--status-gray))",
+          blue: "hsl(var(--status-blue))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

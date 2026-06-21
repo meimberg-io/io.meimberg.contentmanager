@@ -8,6 +8,7 @@ import { LinkedInIcon } from "@/components/icons/LinkedInIcon";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { transformStoryblokBlog } from "@/lib/transform-storyblok";
+import { ymdInZone } from "@/lib/schedule-time";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
@@ -22,11 +23,27 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const response = await fetch('/api/posts?perPage=100');
+        const [response, scheduleRes] = await Promise.all([
+          fetch('/api/posts?perPage=100'),
+          fetch('/api/schedule').catch(() => null),
+        ]);
         const data = await response.json();
-        
+
         const stories = data.posts || [];
         const transformedPosts = stories.map(transformStoryblokBlog);
+
+        // Map storyUuid -> derived slot publish date for scheduled posts (MICM-30/32).
+        const scheduledMap: Record<string, string> = {};
+        if (scheduleRes && scheduleRes.ok) {
+          const sched = await scheduleRes.json();
+          for (const s of sched.schedules || []) {
+            for (const inst of s.instances || []) {
+              if (inst.status === 'pending' && !inst.isOrphan && inst.date) {
+                scheduledMap[inst.storyUuid] = ymdInZone(new Date(inst.date), s.timezone || 'Europe/Berlin');
+              }
+            }
+          }
+        }
         
         setStats({
           totalPosts: stories.length,
@@ -45,9 +62,9 @@ export default function DashboardPage() {
           id: post.id,
           postId: post.slug,
           postTitle: post.pagetitle || post.slug || 'Untitled',
-          action: getLatestAction(post),
+          action: getLatestAction(post, scheduledMap[post.id]),
           timestamp: post.lastModified || post.createdAt,
-          status: getActivityStatus(post)
+          status: getActivityStatus(post, scheduledMap[post.id])
         }));
         
         setRecentActivity(activities);
@@ -61,16 +78,18 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  function getLatestAction(post: any) {
+  function getLatestAction(post: any, scheduledAt?: string) {
     if (post.status.publishedPubler.completed) return 'Published to LinkedIn';
     if (post.status.published.completed) return 'Published to website';
+    if (scheduledAt) return `Scheduled for ${scheduledAt}`;
     if (post.status.contentComplete.completed) return 'Content completed';
     if (post.status.contentComplete.color === 'yellow') return 'Content in progress';
     return 'Post created';
   }
 
-  function getActivityStatus(post: any): 'success' | 'warning' | 'error' | 'info' {
+  function getActivityStatus(post: any, scheduledAt?: string): 'success' | 'warning' | 'error' | 'info' | 'scheduled' {
     if (post.status.published.completed) return 'success';
+    if (scheduledAt) return 'scheduled';
     if (post.status.contentComplete.completed) return 'warning';
     return 'info';
   }

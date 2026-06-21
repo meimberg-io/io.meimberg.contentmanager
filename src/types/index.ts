@@ -149,7 +149,7 @@ export interface ActivityItem {
   postTitle: string;
   action: string;
   timestamp: string;
-  status: 'success' | 'warning' | 'error' | 'info';
+  status: 'success' | 'warning' | 'error' | 'info' | 'scheduled';
 }
 
 // ── Scheduler (MICM-14, relational model MICM-32) ────────────────────────────

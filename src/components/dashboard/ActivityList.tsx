@@ -1,5 +1,5 @@
 import { ActivityItem } from "@/types";
-import { Check, AlertCircle, Info, AlertTriangle } from "lucide-react";
+import { Check, AlertCircle, Info, AlertTriangle, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -15,6 +15,8 @@ export function ActivityList({ activities }: ActivityListProps) {
         return <Check className="h-4 w-4 text-status-green" />;
       case "warning":
         return <AlertTriangle className="h-4 w-4 text-status-yellow" />;
+      case "scheduled":
+        return <CalendarClock className="h-4 w-4 text-status-blue" />;
       case "error":
         return <AlertCircle className="h-4 w-4 text-status-red" />;
       default:
@@ -28,6 +30,8 @@ export function ActivityList({ activities }: ActivityListProps) {
         return "bg-status-green/10";
       case "warning":
         return "bg-status-yellow/10";
+      case "scheduled":
+        return "bg-status-blue/10";
       case "error":
         return "bg-status-red/10";
       default:
