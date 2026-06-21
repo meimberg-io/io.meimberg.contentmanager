@@ -588,6 +588,9 @@ export async function fetchSinglePostManagement(slug: string) {
 export async function fetchBlogPostsManagement(options?: {
   perPage?: number
   page?: number
+  /** Restrict to a `content.date` window (year view) — keeps the fetch bounded. */
+  dateFrom?: string
+  dateTo?: string
 }) {
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
@@ -601,13 +604,19 @@ export async function fetchBlogPostsManagement(options?: {
     'Content-Type': 'application/json'
   } as const
 
+  // Optional date-range pushdown (year view), mirrors the CDN filter_query.
+  const dateParams = [
+    options?.dateFrom ? `&filter_query[date][gt-date]=${encodeURIComponent(options.dateFrom)}` : '',
+    options?.dateTo ? `&filter_query[date][lt-date]=${encodeURIComponent(options.dateTo)}` : '',
+  ].join('')
+
   const [blogRes, articleRes] = await Promise.all([
     managementFetch(
-      `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?starts_with=b/&per_page=${perPage}&page=${page}&sort_by=content.date:desc`,
+      `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?starts_with=b/&per_page=${perPage}&page=${page}&sort_by=content.date:desc${dateParams}`,
       { headers }
     ),
     managementFetch(
-      `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?starts_with=a/&per_page=${perPage}&page=${page}&sort_by=content.date:desc`,
+      `${MANAGEMENT_API_BASE}/spaces/${SPACE_ID}/stories?starts_with=a/&per_page=${perPage}&page=${page}&sort_by=content.date:desc${dateParams}`,
       { headers }
     ),
   ])

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-guard'
 import { createPost, updatePost, deletePost, fetchBlogPostsManagement } from '@/lib/storyblok-management'
-import { fetchBlogPosts } from '@/lib/storyblok'
+import { fetchBlogPosts, mergeStoriesWithPublishFlags } from '@/lib/storyblok'
 
 /**
  * GET /api/posts
@@ -37,38 +37,8 @@ export async function GET(request: Request) {
       console.warn('[API /api/posts] Management fetch failed (continuing with CDN data):', mgmtResult.reason?.message || mgmtResult.reason)
     }
 
-    // If CDN is unavailable, fall back to management list (better than empty list)
-    let stories = cdnStories
-    if (stories.length === 0 && mgmtStories.length > 0) {
-      stories = mgmtStories
-    } else if (stories.length > 0 && mgmtStories.length > 0) {
-      // Merge publish metadata from management into CDN stories by UUID/ID/slug
-      const byUuid = new Map<string, any>()
-      const byId = new Map<string, any>()
-      const bySlug = new Map<string, any>()
-      for (const s of mgmtStories) {
-        if (s?.uuid) byUuid.set(String(s.uuid), s)
-        if (s?.id) byId.set(String(s.id), s)
-        if (s?.slug) bySlug.set(String(s.slug), s)
-      }
-
-      stories = stories.map((s: any) => {
-        const m =
-          byUuid.get(String(s.uuid || '')) ||
-          byId.get(String(s.id || '')) ||
-          bySlug.get(String(s.slug || ''))
-
-        if (!m) return s
-
-        return {
-          ...s,
-          // Ensure publish flags reflect management state when available
-          published: m.published ?? s.published,
-          published_at: m.published_at ?? s.published_at,
-          unpublished_changes: m.unpublished_changes ?? s.unpublished_changes,
-        }
-      })
-    }
+    // Merge management publish flags into CDN stories (shared single source).
+    let stories = mergeStoriesWithPublishFlags(cdnStories, mgmtStories)
 
     // Sort by blog post date (content.date), newest first; fallback to created_at
     const postDate = (s: any) => s?.content?.date || s?.created_at || ''

@@ -37,6 +37,9 @@ export async function fetchBlogPosts(options?: {
   perPage?: number
   page?: number
   searchQuery?: string
+  /** Restrict to a `content.date` window (inclusive of the whole year), e.g. "2026-01-01". */
+  dateFrom?: string
+  dateTo?: string
   filters?: {
     contentComplete?: boolean
     socialmedia?: boolean
@@ -51,6 +54,14 @@ export async function fetchBlogPosts(options?: {
     baseFilter.cm_content_complete = {
       is: options.filters.contentComplete
     }
+  }
+  // Date-range pushdown (MICM: year view). `content.date` is a Storyblok field,
+  // so the year filter runs in the query — only that year's stories come back.
+  if (options?.dateFrom || options?.dateTo) {
+    const dateFilter: Record<string, string> = {}
+    if (options?.dateFrom) dateFilter['gt-date'] = options.dateFrom
+    if (options?.dateTo) dateFilter['lt-date'] = options.dateTo
+    baseFilter.date = dateFilter
   }
 
   const cacheOpt: { cache: RequestCache } = {
@@ -87,6 +98,73 @@ export async function fetchBlogPosts(options?: {
   const stories = mergeStoriesById([...blogStories, ...articleStories])
 
   return { stories, total: stories.length }
+}
+
+/**
+ * Merge Management-API publish flags into CDN (draft) stories (MICM).
+ *
+ * The CDN draft response carries content but not reliable publish state; the
+ * Management API is authoritative for `published` / `unpublished_changes`
+ * (`published_at` persists after an unpublish, so it must not be used). Single
+ * source for this merge — used by `GET /api/posts` and the list view.
+ */
+export function mergeStoriesWithPublishFlags(cdnStories: any[], mgmtStories: any[]): any[] {
+  if (cdnStories.length === 0) return mgmtStories
+  if (mgmtStories.length === 0) return cdnStories
+
+  const byUuid = new Map<string, any>()
+  const byId = new Map<string, any>()
+  const bySlug = new Map<string, any>()
+  for (const s of mgmtStories) {
+    if (s?.uuid) byUuid.set(String(s.uuid), s)
+    if (s?.id) byId.set(String(s.id), s)
+    if (s?.slug) bySlug.set(String(s.slug), s)
+  }
+
+  return cdnStories.map((s: any) => {
+    const m =
+      byUuid.get(String(s.uuid || '')) ||
+      byId.get(String(s.id || '')) ||
+      bySlug.get(String(s.slug || ''))
+    if (!m) return s
+    return {
+      ...s,
+      published: m.published ?? s.published,
+      published_at: m.published_at ?? s.published_at,
+      unpublished_changes: m.unpublished_changes ?? s.unpublished_changes,
+    }
+  })
+}
+
+/**
+ * Earliest year that has a blog/article post (by `content.date`), for the year
+ * picker. Cheap: one ascending `per_page: 1` query per folder — no full scan.
+ */
+export async function fetchEarliestPostYear(): Promise<number | null> {
+  const storyblokApi = getStoryblokApi()
+  const cacheOpt: { cache: RequestCache } = {
+    cache: process.env.NEXT_PUBLIC_STORYBLOK_DISABLECACHING ? 'no-cache' : 'default',
+  }
+  const earliestIn = async (startsWith: string, component: string): Promise<string | null> => {
+    const res = await storyblokApi.get('cdn/stories', {
+      version: 'draft',
+      starts_with: startsWith,
+      filter_query: { component: { in: component } },
+      per_page: 1,
+      page: 1,
+      sort_by: 'content.date:asc',
+    } as ISbStoriesParams, cacheOpt)
+    return res.data?.stories?.[0]?.content?.date || null
+  }
+  const [blogDate, articleDate] = await Promise.all([
+    earliestIn('b/', 'blog').catch(() => null),
+    earliestIn('a/', 'article').catch(() => null),
+  ])
+  const years = [blogDate, articleDate]
+    .filter((d): d is string => !!d)
+    .map((d) => new Date(d).getFullYear())
+    .filter((y) => Number.isFinite(y))
+  return years.length ? Math.min(...years) : null
 }
 
 // Fetch a single blog or article post by slug (tries b/ then a/)
