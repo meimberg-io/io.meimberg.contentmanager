@@ -12,6 +12,10 @@ import {
   fetchBlogPostsManagement,
   getPostById,
   fetchSinglePostManagement,
+  updatePost,
+  updateLinkedinPost,
+  type BlogPostData,
+  type LinkedinPostData,
 } from './storyblok-management'
 import { transformStoryblokBlog, transformStoryblokLinkedin } from './transform-storyblok'
 import { getSettings } from './settings-storage'
@@ -301,4 +305,152 @@ export async function getPost(args: { id?: string; slug?: string }): Promise<Pos
 
   const scheduledMap = await buildScheduledMap()
   return toDetail(story, scheduledMap)
+}
+
+/** Input for the MCP `update_post` write tool (MICM-26). */
+export interface UpdatePostInput {
+  id?: string
+  slug?: string
+  /** Story name/title (all types). */
+  name?: string
+  // blog / article content fields
+  pagetitle?: string
+  pageintro?: string
+  abstract?: string
+  teasertitle?: string
+  readmoretext?: string
+  /** Full raw Storyblok body block array (blog/article). */
+  body?: unknown[]
+  // linkedin content fields
+  linkedin_text?: string
+  /** LinkedIn categorization tags → stored comma-separated in cm_tags. */
+  tags?: string[]
+}
+
+/** Result of a successful `update_post`. */
+export interface UpdatePostResult {
+  id: string
+  slug: string
+  name: string
+  type: PostType
+  /** Storyblok native publish state after the edit (linkedin: always false/draft). */
+  published: boolean
+  /** True if the edit was republished to keep an already-live post live. */
+  republished: boolean
+  editorUrl: string
+}
+
+/** Content fields that only exist on blog/article posts. */
+const BLOG_ARTICLE_FIELDS = [
+  'pagetitle',
+  'pageintro',
+  'abstract',
+  'teasertitle',
+  'readmoretext',
+  'body',
+] as const
+/** Content fields that only exist on LinkedIn posts. */
+const LINKEDIN_FIELDS = ['linkedin_text', 'tags'] as const
+
+/** Reject a body that is not a Storyblok block array (array of objects each with a string component). */
+function assertValidBody(body: unknown): asserts body is Record<string, unknown>[] {
+  if (!Array.isArray(body)) {
+    throw new Error('Feld „body" muss ein Array von Storyblok-Blöcken sein.')
+  }
+  body.forEach((block, i) => {
+    if (!block || typeof block !== 'object' || typeof (block as Record<string, unknown>).component !== 'string') {
+      throw new Error(
+        `Feld „body": Block #${i} ist kein gültiger Storyblok-Block (Objekt mit string-„component" erwartet).`,
+      )
+    }
+  })
+}
+
+/**
+ * Edit an existing post (blog/article/linkedin) and save it back (MICM-26).
+ *
+ * Only supplied fields change (merge over the existing content). Publish state is
+ * preserved: an already-published blog/article is republished with the edit, a
+ * draft stays a draft. LinkedIn "published" is a Publer concept — edits only save
+ * the Storyblok draft, nothing is (re-)pushed to Publer.
+ *
+ * Throws (the caller maps it to an MCP error) on: missing id/slug, post not found,
+ * fields not matching the post type, invalid body, or nothing to update.
+ */
+export async function updatePostFromMcp(input: UpdatePostInput): Promise<UpdatePostResult> {
+  if (!input.id && !input.slug) {
+    throw new Error('Bitte id oder slug angeben.')
+  }
+
+  let story: any = null
+  if (input.id) {
+    try {
+      story = await getPostById(input.id)
+    } catch {
+      story = null
+    }
+  }
+  if (!story && input.slug) {
+    story = await fetchSinglePostManagement(input.slug)
+  }
+  if (!story) {
+    throw new Error(`Kein Post gefunden für ${input.id ? `id=${input.id}` : `slug=${input.slug}`}.`)
+  }
+
+  const type = typeOf(story)
+  const storyId = String(story.id)
+
+  const blogArticleGiven = BLOG_ARTICLE_FIELDS.filter((f) => input[f] !== undefined)
+  const linkedinGiven = LINKEDIN_FIELDS.filter((f) => input[f] !== undefined)
+
+  if (type === 'linkedin' && blogArticleGiven.length) {
+    throw new Error(`LinkedIn-Post: Felder ${blogArticleGiven.join(', ')} gelten nur für Blog/Artikel.`)
+  }
+  if (type !== 'linkedin' && linkedinGiven.length) {
+    throw new Error(`Blog/Artikel: Felder ${linkedinGiven.join(', ')} gelten nur für LinkedIn-Posts.`)
+  }
+
+  if (input.body !== undefined) assertValidBody(input.body)
+
+  if (input.name === undefined && blogArticleGiven.length === 0 && linkedinGiven.length === 0) {
+    throw new Error('Keine Felder zum Aktualisieren angegeben.')
+  }
+
+  let updated: any
+  let republished = false
+
+  if (type === 'linkedin') {
+    const data: Partial<LinkedinPostData> = {}
+    if (input.linkedin_text !== undefined) data.linkedin_text = input.linkedin_text
+    if (input.tags !== undefined) data.cm_tags = input.tags.join(', ')
+    const options: { storyName?: string } = {}
+    if (input.name !== undefined) options.storyName = input.name
+    const res = await updateLinkedinPost(storyId, data, options)
+    updated = res?.story
+  } else {
+    const data: Partial<BlogPostData> = {}
+    if (input.pagetitle !== undefined) data.pagetitle = input.pagetitle
+    if (input.pageintro !== undefined) data.pageintro = input.pageintro
+    if (input.abstract !== undefined) data.abstract = input.abstract
+    if (input.teasertitle !== undefined) data.teasertitle = input.teasertitle
+    if (input.readmoretext !== undefined) data.readmoretext = input.readmoretext
+    if (input.body !== undefined) data.body = input.body as any[]
+    // Preserve publish state: republish only if the story is currently live.
+    republished = story.published === true
+    const options: { storyName?: string; publish?: boolean } = { publish: republished }
+    if (input.name !== undefined) options.storyName = input.name
+    const res = await updatePost(storyId, data, options)
+    updated = res?.story
+  }
+
+  const slug = updated?.slug ?? story.slug
+  return {
+    id: storyId,
+    slug,
+    name: updated?.name ?? story.name,
+    type,
+    published: type === 'linkedin' ? false : updated?.published === true,
+    republished,
+    editorUrl: editorUrlForSlug(slug),
+  }
 }

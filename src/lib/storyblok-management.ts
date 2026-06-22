@@ -339,13 +339,14 @@ export async function createPost(
 }
 
 /**
- * Update an existing blog or article story
- * Saves as draft (does NOT auto-publish)
+ * Update an existing blog or article story.
+ * Saves as draft by default; pass `options.publish` to keep an already-published
+ * story live with the edit (republish + www cache invalidation) — see MICM-26.
  */
 export async function updatePost(
   storyId: string,
   data: Partial<BlogPostData>,
-  options?: { storyName?: string; slug?: string; contentType?: CmContentType }
+  options?: { storyName?: string; slug?: string; contentType?: CmContentType; publish?: boolean }
 ) {
   if (!MANAGEMENT_TOKEN) {
     throw new Error('STORYBLOK_MANAGEMENT_TOKEN not configured')
@@ -389,10 +390,11 @@ export async function updatePost(
         'Authorization': MANAGEMENT_TOKEN,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        story: storyUpdate,
-        // No publish: 1 — save as draft only
-      })
+      body: JSON.stringify(
+        // publish:1 keeps an already-published story live with the edit (MICM-26);
+        // omitted = draft-only save (default, e.g. never-published drafts).
+        options?.publish ? { story: storyUpdate, publish: 1 } : { story: storyUpdate }
+      )
     }
   )
 
@@ -400,6 +402,9 @@ export async function updatePost(
     const error = await response.json()
     throw new Error(`Failed to update post: ${error.error || response.statusText}`)
   }
+
+  // Republished → invalidate the public website cache (same as publishPost).
+  if (options?.publish) await revalidateWww()
 
   return await response.json()
 }

@@ -3,7 +3,7 @@ import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js'
 import { createPost } from '@/lib/storyblok-management'
 import { validateMcpToken } from '@/lib/mcp-tokens'
-import { editorUrlForSlug, listPosts, getPost } from '@/lib/mcp-posts'
+import { editorUrlForSlug, listPosts, getPost, updatePostFromMcp } from '@/lib/mcp-posts'
 
 // node:crypto (validateMcpToken) + the management-token write path → Node runtime.
 export const runtime = 'nodejs'
@@ -134,6 +134,78 @@ const handler = createMcpHandler(
         }
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(post, null, 2) }],
+        }
+      }
+    )
+
+    server.registerTool(
+      'update_post',
+      {
+        title: 'Update Post',
+        description:
+          'Editiert einen bestehenden Post (Blog, Artikel oder LinkedIn) und speichert ihn zurück. ' +
+          'Adressierung per id ODER slug. Nur übergebene Felder werden geändert (Merge) — alle anderen bleiben unangetastet. ' +
+          'WICHTIG für Body-/Textänderungen: zuerst get_post aufrufen, den gelieferten Inhalt anpassen und das ' +
+          'KOMPLETTE body-Block-Array zurückschicken — nur die betroffene Stelle ändern, Block-Struktur und _uid erhalten. ' +
+          'Publish-Status bleibt erhalten: ein bereits veröffentlichter Blog/Artikel wird mit der Änderung sofort wieder ' +
+          'veröffentlicht; ein Draft bleibt Draft (LinkedIn: immer Draft, kein Publer-Push). ' +
+          'pagetitle/pageintro/abstract/teasertitle/readmoretext/body gelten nur für Blog/Artikel, linkedin_text/tags nur für LinkedIn.',
+        inputSchema: {
+          id: z.string().optional().describe('Numerische Storyblok-Story-id (aus list_posts / get_post). id bevorzugt.'),
+          slug: z.string().optional().describe('Story-Slug (Alternative zur id).'),
+          name: z.string().optional().describe('Story-Name/Titel (alle Typen).'),
+          pagetitle: z.string().optional().describe('Blog/Artikel: Seitentitel.'),
+          pageintro: z.string().optional().describe('Blog/Artikel: Intro-Text.'),
+          abstract: z.string().optional().describe('Blog/Artikel: Abstract.'),
+          teasertitle: z.string().optional().describe('Blog/Artikel: Teaser-Titel.'),
+          readmoretext: z.string().optional().describe('Blog/Artikel: Read-more-Text.'),
+          body: z
+            .array(z.any())
+            .optional()
+            .describe('Blog/Artikel: komplettes rohes Storyblok-Body-Block-Array (vorher via get_post lesen und modifizieren).'),
+          linkedin_text: z.string().optional().describe('LinkedIn: Post-Text.'),
+          tags: z
+            .array(z.string())
+            .optional()
+            .describe('LinkedIn: Tags (werden komma-separiert in cm_tags gespeichert).'),
+        },
+      },
+      async (input) => {
+        if (!input.id && !input.slug) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: 'Fehler: Bitte id oder slug angeben.' }],
+          }
+        }
+        try {
+          const result = await updatePostFromMcp(input)
+          const stateText =
+            result.type === 'linkedin'
+              ? 'als Draft gespeichert (LinkedIn — kein Publer-Push)'
+              : result.republished
+                ? 'gespeichert und wieder veröffentlicht (live)'
+                : 'als Draft gespeichert'
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text:
+                  `Post „${result.name}" ${stateText}.\n` +
+                  `Editor: ${result.editorUrl}\n\n` +
+                  JSON.stringify(result, null, 2),
+              },
+            ],
+          }
+        } catch (err) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text' as const,
+                text: `Fehler beim Aktualisieren: ${err instanceof Error ? err.message : String(err)}`,
+              },
+            ],
+          }
         }
       }
     )
