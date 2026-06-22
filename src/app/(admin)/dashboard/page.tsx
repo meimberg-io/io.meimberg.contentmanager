@@ -57,7 +57,9 @@ export default function DashboardPage() {
 
         setStats({
           totalPosts: stories.length,
-          contentComplete: transformedPosts.filter((p: any) => p.status.contentComplete.completed).length,
+          // MICM-37: "content done" = all required fields filled (pipeline yellow+),
+          // not the dropped manual-confirm flag. color !== 'red' ⇔ content present.
+          contentComplete: transformedPosts.filter((p: any) => p.status.contentComplete.color !== 'red').length,
           published: transformedPosts.filter((p: any) => p.status.published.completed).length,
           linkedinPosts: transformedPosts.filter((p: any) => linkedinByBlog[p.id]?.color === 'green').length
         });
@@ -92,15 +94,14 @@ export default function DashboardPage() {
     if (linkedinPublished) return 'Published to LinkedIn';
     if (post.status.published.completed) return 'Published to website';
     if (scheduledAt) return `Scheduled for ${scheduledAt}`;
-    if (post.status.contentComplete.completed) return 'Content completed';
-    if (post.status.contentComplete.color === 'yellow') return 'Content in progress';
+    if (post.status.contentComplete.color !== 'red') return 'Content ready';
     return 'Post created';
   }
 
   function getActivityStatus(post: any, scheduledAt?: string): 'success' | 'warning' | 'error' | 'info' | 'scheduled' {
     if (post.status.published.completed) return 'success';
     if (scheduledAt) return 'scheduled';
-    if (post.status.contentComplete.completed) return 'warning';
+    if (post.status.contentComplete.color !== 'red') return 'warning';
     return 'info';
   }
 

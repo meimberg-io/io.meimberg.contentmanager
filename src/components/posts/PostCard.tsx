@@ -153,7 +153,7 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
           <span className={cn("text-xs whitespace-nowrap", scheduledAt ? "text-blue-400" : "text-muted-foreground")} title={scheduledAt ? "Geplanter Veröffentlichungstermin" : undefined}>
             {scheduledAt || post.date || 'No date'}
           </span>
-          <StatusRow status={post.status} linkedin={linkedinStatus} scheduled={!!scheduledAt} />
+          <StatusRow status={post.status} linkedin={linkedinStatus} scheduledAt={scheduledAt} />
         </div>
 
         {!hideActions && (
@@ -222,7 +222,7 @@ export function PostCard({ post, isSelected, onSelect, viewMode = "grid", hideAc
             {post.origin && <OriginIcon origin={post.origin} />}
             {scheduledAt || post.date || 'No date'}
           </span>
-          <StatusRow status={post.status} linkedin={linkedinStatus} scheduled={!!scheduledAt} />
+          <StatusRow status={post.status} linkedin={linkedinStatus} scheduledAt={scheduledAt} />
         </div>
       </div>
     </div>

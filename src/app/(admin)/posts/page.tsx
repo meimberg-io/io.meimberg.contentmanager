@@ -34,37 +34,37 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
-// Multi-state status filter (per dimension).
+// Four-phase pipeline filter (per axis). `red` is the leftmost "fehlt/keiner" slot,
+// rendered red for Content (required) and gray for LinkedIn (optional) — see StatusFilterGrid.
 interface StatusFilter {
   red: boolean;
   yellow: boolean;
+  blue: boolean;
   green: boolean;
 }
 
 interface MultiStateFilters {
-  contentComplete: StatusFilter;
-  published: StatusFilter;
+  content: StatusFilter;
   linkedin: StatusFilter;
 }
 
-type DimCounts = { red: number; yellow: number; green: number };
+type DimCounts = { red: number; yellow: number; blue: number; green: number };
 interface ViewCounts {
-  contentComplete: DimCounts;
-  published: DimCounts;
+  content: DimCounts;
   linkedin: DimCounts;
 }
 
-const defaultFilter: StatusFilter = { red: false, yellow: false, green: false };
+const defaultFilter: StatusFilter = { red: false, yellow: false, blue: false, green: false };
 const emptyCounts: ViewCounts = {
-  contentComplete: { red: 0, yellow: 0, green: 0 },
-  published: { red: 0, yellow: 0, green: 0 },
-  linkedin: { red: 0, yellow: 0, green: 0 },
+  content: { red: 0, yellow: 0, blue: 0, green: 0 },
+  linkedin: { red: 0, yellow: 0, blue: 0, green: 0 },
 };
 
 function serializeFilter(filter: StatusFilter): string {
   let s = '';
   if (filter.red) s += 'r';
   if (filter.yellow) s += 'y';
+  if (filter.blue) s += 'b';
   if (filter.green) s += 'g';
   return s;
 }
@@ -74,6 +74,7 @@ function deserializeFilter(param: string | null): StatusFilter {
   return {
     red: param.includes('r'),
     yellow: param.includes('y'),
+    blue: param.includes('b'),
     green: param.includes('g'),
   };
 }
@@ -84,14 +85,16 @@ function FilterButton({
   count,
   onClick
 }: {
-  color: 'red' | 'yellow' | 'green';
+  color: 'red' | 'gray' | 'yellow' | 'blue' | 'green';
   active: boolean;
   count?: number;
   onClick: () => void;
 }) {
   const bgColors = {
     red: active ? 'bg-red-500 text-white' : 'bg-red-500/20 text-red-400 hover:bg-red-500/40',
+    gray: active ? 'bg-gray-500 text-white' : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/40',
     yellow: active ? 'bg-yellow-500 text-black' : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/40',
+    blue: active ? 'bg-blue-500 text-white' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/40',
     green: active ? 'bg-green-500 text-white' : 'bg-green-500/20 text-green-400 hover:bg-green-500/40',
   };
 
@@ -108,6 +111,10 @@ function FilterButton({
   );
 }
 
+// Status filter (MICM-37): two pipelines (Content · LinkedIn), each a four-phase axis.
+// Columns: "fehlt/keiner" → in Arbeit (yellow) → eingeplant (blue) → veröffentlicht (green).
+// The first column toggles the same `red` filter slot for both rows; it's rendered red
+// for Content (required fields missing) and gray for LinkedIn (no post attached).
 function StatusFilterGrid({
   filters,
   onChange,
@@ -117,39 +124,41 @@ function StatusFilterGrid({
   onChange: (key: keyof MultiStateFilters, filter: StatusFilter) => void;
   counts: ViewCounts;
 }) {
-  const rows: { key: keyof MultiStateFilters; label: string; hasYellow: boolean }[] = [
-    { key: 'contentComplete', label: 'Content', hasYellow: true },
-    { key: 'published', label: 'Published', hasYellow: false },
-    // LinkedIn dot: red button = no LinkedIn post (gray), yellow = in progress/scheduled, green = published.
-    { key: 'linkedin', label: 'LinkedIn', hasYellow: true },
+  const rows: { key: keyof MultiStateFilters; label: string; firstColor: 'red' | 'gray' }[] = [
+    { key: 'content', label: 'Content', firstColor: 'red' },
+    { key: 'linkedin', label: 'LinkedIn', firstColor: 'gray' },
   ];
+  const toggle = (key: keyof MultiStateFilters, field: keyof StatusFilter) =>
+    onChange(key, { ...filters[key], [field]: !filters[key][field] });
 
   return (
-    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 gap-y-2 items-center">
-      {rows.map(({ key, label, hasYellow }) => (
+    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-2 gap-y-2 items-center">
+      {rows.map(({ key, label, firstColor }) => (
         <React.Fragment key={key}>
           <span className="text-sm">{label}</span>
           <FilterButton
-            color="red"
+            color={firstColor}
             active={filters[key].red}
             count={counts[key].red}
-            onClick={() => onChange(key, { ...filters[key], red: !filters[key].red })}
+            onClick={() => toggle(key, 'red')}
           />
-          {hasYellow ? (
-            <FilterButton
-              color="yellow"
-              active={filters[key].yellow}
-              count={counts[key].yellow}
-              onClick={() => onChange(key, { ...filters[key], yellow: !filters[key].yellow })}
-            />
-          ) : (
-            <div className="min-w-[28px] h-7" />
-          )}
+          <FilterButton
+            color="yellow"
+            active={filters[key].yellow}
+            count={counts[key].yellow}
+            onClick={() => toggle(key, 'yellow')}
+          />
+          <FilterButton
+            color="blue"
+            active={filters[key].blue}
+            count={counts[key].blue}
+            onClick={() => toggle(key, 'blue')}
+          />
           <FilterButton
             color="green"
             active={filters[key].green}
             count={counts[key].green}
-            onClick={() => onChange(key, { ...filters[key], green: !filters[key].green })}
+            onClick={() => toggle(key, 'green')}
           />
         </React.Fragment>
       ))}
@@ -202,8 +211,7 @@ function AllPostsPageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<MultiStateFilters>({
-    contentComplete: { ...defaultFilter },
-    published: { ...defaultFilter },
+    content: { ...defaultFilter },
     linkedin: { ...defaultFilter },
   });
   // Single-select data scope: 'unpublished' (worklist) or a 4-digit year.
@@ -222,8 +230,7 @@ function AllPostsPageContent() {
     setSearchQuery(searchParams.get('q') || '');
     setScope(searchParams.get('scope') || UNPUBLISHED);
     setFilters({
-      contentComplete: deserializeFilter(searchParams.get('content')),
-      published: deserializeFilter(searchParams.get('published')),
+      content: deserializeFilter(searchParams.get('content')),
       linkedin: deserializeFilter(searchParams.get('linkedin')),
     });
     setIsInitialized(true);
@@ -235,12 +242,10 @@ function AllPostsPageContent() {
 
     const timeoutId = setTimeout(() => {
       const params = new URLSearchParams();
-      const content = serializeFilter(filters.contentComplete);
-      const published = serializeFilter(filters.published);
+      const content = serializeFilter(filters.content);
       const linkedin = serializeFilter(filters.linkedin);
 
       if (content) params.set('content', content);
-      if (published) params.set('published', published);
       if (linkedin) params.set('linkedin', linkedin);
       if (searchQuery) params.set('q', searchQuery);
       if (viewMode === 'grid') params.set('view', 'grid');
@@ -262,11 +267,9 @@ function AllPostsPageContent() {
       try {
         const params = new URLSearchParams();
         params.set('scope', scope);
-        const content = serializeFilter(filters.contentComplete);
-        const published = serializeFilter(filters.published);
+        const content = serializeFilter(filters.content);
         const linkedin = serializeFilter(filters.linkedin);
         if (content) params.set('content', content);
-        if (published) params.set('published', published);
         if (linkedin) params.set('linkedin', linkedin);
         if (searchQuery) params.set('q', searchQuery);
 
@@ -346,15 +349,14 @@ function AllPostsPageContent() {
 
   const clearFilters = () => {
     setFilters({
-      contentComplete: { ...defaultFilter },
-      published: { ...defaultFilter },
+      content: { ...defaultFilter },
       linkedin: { ...defaultFilter },
     });
     setSearchQuery("");
     setScope(UNPUBLISHED);
   };
 
-  const isFilterActive = (f: StatusFilter) => f.red || f.yellow || f.green;
+  const isFilterActive = (f: StatusFilter) => f.red || f.yellow || f.blue || f.green;
   const hasActiveFilters =
     Object.values(filters).some(isFilterActive) || !!searchQuery || scope !== UNPUBLISHED;
 

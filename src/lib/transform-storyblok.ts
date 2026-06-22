@@ -170,3 +170,29 @@ function getPublishedColor(story: any): 'green' | 'yellow' | 'red' | 'gray' {
   }
   return 'green' // Published and up to date
 }
+
+/**
+ * Unified publishing-pipeline color for the Content axis (MICM-37).
+ *
+ * Folds field-completeness + scheduler + publish state into ONE four-phase axis,
+ * mirroring the LinkedIn axis (which `buildLinkedinStatusByBlog` already produces
+ * as gray → yellow → blue → green):
+ *   - red    = required content fields missing
+ *   - yellow = content present/complete, not yet scheduled ("in Arbeit")
+ *   - blue   = scheduled for publishing (queued, not live yet)
+ *   - green  = published (live on the website)
+ *
+ * `contentColor` is the field-completeness color from `getContentCompleteColor`
+ * (green = manually confirmed, yellow = all fields filled, red = missing). For the
+ * pipeline both green and yellow mean "content there" → yellow; the manual-confirm
+ * distinction is intentionally dropped here.
+ */
+export function getContentPipelineColor(args: {
+  contentColor: 'green' | 'yellow' | 'red' | 'gray' | 'blue'
+  published: boolean
+  scheduled: boolean
+}): 'red' | 'yellow' | 'blue' | 'green' {
+  if (args.published) return 'green'
+  if (args.scheduled) return 'blue'
+  return args.contentColor === 'red' ? 'red' : 'yellow'
+}

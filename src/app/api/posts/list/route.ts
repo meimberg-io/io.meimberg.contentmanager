@@ -21,7 +21,6 @@ export async function GET(request: Request) {
     const result = await getPostListView({
       view: searchParams.get('scope') || undefined,
       content: searchParams.get('content'),
-      published: searchParams.get('published'),
       linkedin: searchParams.get('linkedin'),
       q: searchParams.get('q'),
     })
