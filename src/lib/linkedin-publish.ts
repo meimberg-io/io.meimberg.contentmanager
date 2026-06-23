@@ -48,7 +48,9 @@ export interface LinkedinPublishResult {
  * Publish a LinkedIn post to Publer immediately.
  *
  * - Attached posts (cm_blog_ref) require the parent blog to be published (else 409)
- *   and carry the blog's OG image; the fresh blog URL is appended to the text.
+ *   and are sent text-only with the fresh blog URL appended, so LinkedIn unfurls it
+ *   into a link-preview card (og:image + clickable title + source). No media is
+ *   attached — a photo would suppress the unfurl and show a bare image instead.
  * - Idempotent: an already-published Publer entry blocks (409); a still-queued one
  *   is deleted and replaced.
  * - The Storyblok story stays draft-only; only cm_publer_* fields are written.
@@ -75,7 +77,6 @@ export async function publishLinkedinNow(storyId: string): Promise<LinkedinPubli
 
   // Hard publish guard (MICM-12 AK6): attached post requires a published parent blog.
   let blogUrl: string | undefined
-  let blogImageUrl: string | undefined
   if (isAttached) {
     const blog = await resolveBlogStoryByUuid(blogUuid!)
     if (!blog) throw new LinkedinPublishError('Parent blog not found — cannot resolve link', 400)
@@ -87,7 +88,6 @@ export async function publishLinkedinNow(storyId: string): Promise<LinkedinPubli
       )
     }
     blogUrl = preview.url
-    blogImageUrl = preview.imageUrl
   }
 
   // Replace-while-queued / block-if-published (MICM-12 AK5).
@@ -114,8 +114,12 @@ export async function publishLinkedinNow(storyId: string): Promise<LinkedinPubli
     }
   }
 
-  // Media: standalone → own image; attached → the blog's OG image (header/teaser).
-  const mediaUrl = isAttached ? blogImageUrl : content.linkedin_image?.filename || undefined
+  // Media by post kind:
+  // - Standalone → attach its own image as a photo (no link, so no unfurl to lose).
+  // - Attached → NO media: a text-only ('status') post lets LinkedIn unfurl the
+  //   appended blog URL into a preview card (og:image + clickable title + source).
+  //   Attaching the image as a photo would suppress that card and show a bare image.
+  const mediaUrl = isAttached ? undefined : content.linkedin_image?.filename || undefined
   const finalText = formatForLinkedIn(text, blogUrl)
 
   const { jobId, postIds } = await scheduleLinkedinPost({
