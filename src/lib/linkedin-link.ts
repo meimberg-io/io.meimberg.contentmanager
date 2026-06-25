@@ -13,6 +13,20 @@
 /** Public base host for blog URLs. Configurable via env, no hardcode scattered. */
 export const PUBLIC_BASE_HOST = (process.env.WWW_PUBLIC_BASE_URL || 'https://www.meimberg.io').replace(/\/+$/, '')
 
+/** Strip HTML tags + collapse whitespace (mirrors www metadata.stripHtml). */
+function stripHtml(input?: string): string {
+  if (!input) return ''
+  return input.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/** Clamp to a max length on a word boundary, ellipsis suffix (mirrors www metadata.clamp). */
+function clamp(input: string, max: number): string {
+  if (input.length <= max) return input
+  const truncated = input.slice(0, max + 1)
+  const lastSpace = truncated.lastIndexOf(' ')
+  return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated.slice(0, max)).trimEnd() + '…'
+}
+
 /** Build the public blog URL from a Storyblok full_slug (e.g. "b/my-post" → host + "/b/my-post"). */
 export function buildBlogUrl(fullSlug: string): string {
   return `${PUBLIC_BASE_HOST}/${String(fullSlug || '').replace(/^\/+/, '')}`
@@ -25,6 +39,8 @@ export interface BlogLinkPreview {
   fullSlug: string
   contentType: 'blog' | 'article'
   title: string
+  /** OG description (abstract/pageintro), for the LinkedIn link-share card. */
+  description?: string
   imageUrl?: string
   url: string
   /** Whether the blog story is published (link/unfurl only works once published). */
@@ -51,6 +67,8 @@ export function buildBlogLinkPreview(uuid: string, blogStory: any): BlogLinkPrev
     contentType,
     // OG title: pagetitle, fallback teasertitle (matches www deriveTitle).
     title: content.pagetitle || content.teasertitle || blogStory?.name || blogStory?.slug || '',
+    // OG description: abstract, fallback pageintro (matches www deriveDescription).
+    description: clamp(stripHtml(content.abstract || content.pageintro || ''), 160) || undefined,
     // OG image: headerpicture, fallback teaserimage (matches www selectOgImage).
     imageUrl: content.headerpicture?.filename || content.teaserimage?.filename || undefined,
     url: buildBlogUrl(fullSlug),

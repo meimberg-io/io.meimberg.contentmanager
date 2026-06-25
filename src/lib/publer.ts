@@ -619,8 +619,13 @@ function extractPublerPostIds(jobResult: any): string[] {
  * at the slot moment), so Publer is used as a plain "post now" API: the post hits
  * Publer's Immediate-Publishing endpoint (`/posts/schedule/publish`) with no
  * `scheduled_at`, which bypasses Publer's AutoSchedule/calendar path entirely (MICM-33).
- * - With mediaUrl (image): upload via uploadMediaFromUrl, type 'photo'.
- * - Without media: type 'status' (text-only; an appended link unfurls into a card).
+ * Post kind decides the Publer network type:
+ * - With `link` (attached post): a LINK share (type 'link') — Publer hands LinkedIn
+ *   the URL + OG title/description/image and LinkedIn renders the preview CARD.
+ *   NOTE: the API does NOT auto-unfurl a URL that merely sits in 'status' text — the
+ *   dedicated 'link' type is required (Publer API: content-types/link-posts).
+ * - With `mediaUrl` (standalone image): upload via uploadMediaFromUrl, type 'photo'.
+ * - Neither: type 'status' (plain text).
  * Returns the job id and the real Publer post ids extracted from the job result.
  */
 export async function scheduleLinkedinPost(params: {
@@ -628,21 +633,30 @@ export async function scheduleLinkedinPost(params: {
   accountId: string
   mediaUrl?: string
   mediaName?: string
+  /** Attached posts: build a LinkedIn LINK share (preview card) from the blog's OG data. */
+  link?: { url: string; title?: string; description?: string; imageUrl?: string }
 }): Promise<{ jobId: string; postIds: string[] }> {
   const headers = getPubHeaders()
-  const { text, accountId, mediaUrl, mediaName } = params
+  const { text, accountId, mediaUrl, mediaName, link } = params
 
-  let media: Array<{ id: string; type: string }> | undefined
-  if (mediaUrl) {
+  // Network config by kind. A 'link' post carries the URL + OG metadata so LinkedIn
+  // renders a preview card; a 'photo' post carries an uploaded image; 'status' is text.
+  let networkConfig: Record<string, any>
+  if (link) {
+    const linkObj: Record<string, any> = { url: link.url }
+    if (link.title) linkObj.title = link.title
+    if (link.description) linkObj.description = link.description
+    if (link.imageUrl) {
+      linkObj.images = [link.imageUrl]
+      linkObj.default_image = 0
+    }
+    networkConfig = { type: 'link', text, link: linkObj }
+  } else if (mediaUrl) {
     const mediaId = await uploadMediaFromUrl(mediaUrl, mediaName || 'linkedin-image')
-    media = [{ id: mediaId, type: 'image' }]
+    networkConfig = { type: 'photo', text, media: [{ id: mediaId, type: 'image' }] }
+  } else {
+    networkConfig = { type: 'status', text }
   }
-
-  const networkConfig: Record<string, any> = {
-    type: media ? 'photo' : 'status',
-    text,
-  }
-  if (media) networkConfig.media = media
 
   // Post immediately via Publer's Immediate-Publishing endpoint — no `scheduled_at`,
   // so Publer bypasses its AutoSchedule/calendar path (MICM-17, MICM-33).

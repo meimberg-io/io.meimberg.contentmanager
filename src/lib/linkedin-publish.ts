@@ -48,9 +48,9 @@ export interface LinkedinPublishResult {
  * Publish a LinkedIn post to Publer immediately.
  *
  * - Attached posts (cm_blog_ref) require the parent blog to be published (else 409)
- *   and are sent text-only with the fresh blog URL appended, so LinkedIn unfurls it
- *   into a link-preview card (og:image + clickable title + source). No media is
- *   attached — a photo would suppress the unfurl and show a bare image instead.
+ *   and are sent as a Publer LINK share (type 'link') carrying the blog's OG
+ *   title/description/image, so LinkedIn renders the preview card (image + clickable
+ *   title + source). The URL is NOT appended to the caption — it lives in the card.
  * - Idempotent: an already-published Publer entry blocks (409); a still-queued one
  *   is deleted and replaced.
  * - The Storyblok story stays draft-only; only cm_publer_* fields are written.
@@ -76,7 +76,8 @@ export async function publishLinkedinNow(storyId: string): Promise<LinkedinPubli
   const isAttached = !!blogUuid
 
   // Hard publish guard (MICM-12 AK6): attached post requires a published parent blog.
-  let blogUrl: string | undefined
+  // The blog's OG data becomes a Publer LINK share so LinkedIn renders the preview card.
+  let blogLink: { url: string; title?: string; description?: string; imageUrl?: string } | undefined
   if (isAttached) {
     const blog = await resolveBlogStoryByUuid(blogUuid!)
     if (!blog) throw new LinkedinPublishError('Parent blog not found — cannot resolve link', 400)
@@ -87,7 +88,12 @@ export async function publishLinkedinNow(storyId: string): Promise<LinkedinPubli
         409,
       )
     }
-    blogUrl = preview.url
+    blogLink = {
+      url: preview.url,
+      title: preview.title || undefined,
+      description: preview.description,
+      imageUrl: preview.imageUrl,
+    }
   }
 
   // Replace-while-queued / block-if-published (MICM-12 AK5).
@@ -114,17 +120,17 @@ export async function publishLinkedinNow(storyId: string): Promise<LinkedinPubli
     }
   }
 
-  // Media by post kind:
-  // - Standalone → attach its own image as a photo (no link, so no unfurl to lose).
-  // - Attached → NO media: a text-only ('status') post lets LinkedIn unfurl the
-  //   appended blog URL into a preview card (og:image + clickable title + source).
-  //   Attaching the image as a photo would suppress that card and show a bare image.
+  // Post kind decides the Publer network type (see scheduleLinkedinPost):
+  // - Attached  → LINK share (blogLink): URL + OG title/description/image → preview card.
+  //   The caption stays clean; the URL lives in the card, not the text.
+  // - Standalone → its own image as a photo; no link card.
   const mediaUrl = isAttached ? undefined : content.linkedin_image?.filename || undefined
-  const finalText = formatForLinkedIn(text, blogUrl)
+  const finalText = formatForLinkedIn(text)
 
   const { jobId, postIds } = await scheduleLinkedinPost({
     text: finalText,
     accountId: getLinkedinAccountId()!,
+    link: blogLink,
     mediaUrl,
     mediaName: `linkedin-${story.slug || storyId}`,
   })
