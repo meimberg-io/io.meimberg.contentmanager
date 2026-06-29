@@ -1,0 +1,13 @@
+{
+  "teamId": "2102860a-d47c-405b-970b-498d72b914c8",
+  "teamKey": "SMEDIT",
+  "teamName": "SmartEditor",
+  "commitPrefix": "SMEDIT-",
+  "statusNames": {
+    "spec": "Needs specification",
+    "ready": "Ready to implement",
+    "inProgress": "In Progress",
+    "implemented": "Implemented",
+    "done": "Done"
+  }
+}

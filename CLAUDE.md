@@ -54,8 +54,10 @@ Content model:
 - **Confirmations/dialogs**: use the existing `AlertDialog` / `Dialog` components. **Never** use native `window.confirm` / `alert` / `prompt` in app UI. Destructive actions (delete/unpublish/reset) must show a modal confirm.
 - **UI stack**: shadcn/ui + Radix + Tailwind (`components.json`, `src/components/ui/`). Follow existing component patterns.
 - After changing Storyblok component schemas, run `make sb-sync` so `src/types/component-types-sb.d.ts` stays in sync (it is CLI-generated — do not hand-edit).
-- **`docs/` holds permanently valid documentation only.** No dated specs, session notes, scratch/issue lists, or transient work-in-progress — that content belongs in the issue tracker (Jira **MICM**), not in `docs/`. Specs live in the issue description (see "Issue tracking").
+- **`docs/` holds permanently valid documentation only.** No dated specs, session notes, scratch/issue lists, or transient work-in-progress — that content belongs in the issue tracker (Linear team **SmartEditor**), not in `docs/`. Specs live in the issue description (see "Issue tracking").
 
-## Issue tracking (Jira)
+## Issue tracking (Linear)
 
-Configured in `.claude/jira.json` — Jira project **MICM** (`io.meimberg.contentmanager`). The agent-os workflow skills (`/specify`, `/implement`, `/commit`) auto-detect this. Status flow: `Zu Spezifizieren` → `Zu erledigen` → `In Arbeit` → `Erledigt`. Specs live in the issue **description**.
+Configured in `.claude/linear.json` — Linear team **SmartEditor** (key `SMEDIT`). The agent-os workflow skills (`/specify`, `/implement`, `/commit`) auto-detect this. Status flow: `Needs specification` → `Ready to implement` → `In Progress` → `Implemented` → `Done` (plus `Queue` / `Backlog` for un-triaged work). Specs live in the issue **description**.
+
+> Migrated from Jira (project **MICM**) on 2026-06-29. The old MICM issues remain in Jira untouched as an archive; each Linear issue carries a `Migriert aus Jira MICM-N` footer. The three former Jira epics (MICM-6/14/21) are now Linear **projects**.
