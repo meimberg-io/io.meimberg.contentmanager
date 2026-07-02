@@ -20,6 +20,35 @@ services:
     networks:
       - traefik
 
+  # Self-contained scheduler tick — replaces the former ansible-managed host cron
+  # on hc-02 (role contentmanager_scheduler). Every 15 min it POSTs the scheduler
+  # tick with the shared CRON_SECRET bearer, reaching the app in-network by
+  # container name (no public/TLS round-trip). The tick is idempotent, so an
+  # overlapping host cron during the transition is harmless.
+  ${PROJECT_NAME}-scheduler:
+    image: curlimages/curl:8.11.1
+    container_name: ${PROJECT_NAME}-scheduler
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - ${PROJECT_NAME}
+    networks:
+      - traefik
+    entrypoint: ["/bin/sh", "-c"]
+    # Single list element = one arg to `sh -c` (a plain string command would be
+    # shell-split into separate args and break). $$CRON_SECRET escapes compose
+    # interpolation so the container shell expands it from .env at runtime;
+    # envsubst on the server is scoped to PROJECT_NAME/DOCKER_IMAGE/APP_DOMAIN
+    # (see deploy.yml), so it leaves $$CRON_SECRET intact.
+    command:
+      - |
+        while true; do
+          sleep 900
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $$CRON_SECRET" \
+            "http://${PROJECT_NAME}:3000/api/cron/tick" > /dev/null 2>&1 || true
+        done
+
 networks:
   traefik:
     external: true

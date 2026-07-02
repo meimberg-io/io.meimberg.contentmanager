@@ -19,7 +19,7 @@ function constantTimeEquals(a: string, b: string): boolean {
  * POST /api/cron/tick — run one scheduler tick (MICM-16).
  *
  * Two auth modes:
- *  - Headless cron (ansible-managed on the server): `Authorization: Bearer <CRON_SECRET>`.
+ *  - Headless tick (the scheduler sidecar in docker-compose.prod.yml): `Authorization: Bearer <CRON_SECRET>`.
  *  - Admin "run now" button: a logged-in session (requireAuth) — no secret needed.
  *
  * The path is intentionally NOT under any middleware-protected prefix

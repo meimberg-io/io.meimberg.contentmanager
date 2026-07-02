@@ -176,7 +176,9 @@ jobs:
           export DOCKER_IMAGE="${DOCKER_IMAGE}"
           export APP_DOMAIN="${APP_DOMAIN}"
           
-          envsubst < docker-compose.prod.yml > docker-compose.yml
+          # Scope substitution to deploy-time vars only, so runtime shell refs in
+          # the scheduler sidecar (e.g. $CRON_SECRET) survive into the container.
+          envsubst '${PROJECT_NAME} ${DOCKER_IMAGE} ${APP_DOMAIN}' < docker-compose.prod.yml > docker-compose.yml
           
           echo "Generated docker-compose.yml:"
           cat docker-compose.yml
