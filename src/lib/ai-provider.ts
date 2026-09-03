@@ -33,6 +33,19 @@ export const AI_MODELS: AIModel[] = [
 
 export const DEFAULT_MODEL = 'gpt-5.5'
 
+/**
+ * Hard cap on generated tokens, applied to every provider.
+ *
+ * 4096 (the previous value) truncated long articles mid-sentence — a German
+ * blog body of ~2000 words already hits it, and `optimizeText` on a full
+ * document hits it even sooner because the whole article is re-emitted.
+ * All current models here allow far more (up to 128K), but these calls are
+ * non-streaming plain `fetch`, so the ceiling is bounded by request timeouts
+ * rather than by the models: 16000 is the largest value that comfortably
+ * completes in one HTTP request.
+ */
+const MAX_OUTPUT_TOKENS = 16000
+
 // API Keys from environment
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
@@ -135,7 +148,7 @@ async function callOpenAI(prompt: string, imageUrl: string | undefined, model: s
           content
         }
       ],
-      max_completion_tokens: 4096
+      max_completion_tokens: MAX_OUTPUT_TOKENS
     })
   })
 
@@ -191,7 +204,7 @@ async function callAnthropic(prompt: string, imageUrl: string | undefined, model
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: MAX_OUTPUT_TOKENS,
       messages: [
         {
           role: 'user',
@@ -252,7 +265,7 @@ async function callGoogleAI(prompt: string, imageUrl: string | undefined, model:
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
-          maxOutputTokens: 4096
+          maxOutputTokens: MAX_OUTPUT_TOKENS
         }
       })
     }
