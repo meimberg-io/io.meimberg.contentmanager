@@ -180,24 +180,4 @@ Der Intake endet mit dem Auftrag, dem Seed Folgendes hinzuzufügen, damit alle a
 
 > Status: Diese Fusion ist bereits erfolgt und liegt als [`bestandsanalyse-und-gesamtrequirements.md`](bestandsanalyse-und-gesamtrequirements.md) vor (vollständige Requirements-Inventur beider Versionen, Feature-Diff und abgeleitetes Gesamtrequirement).
 
----
 
-## Anhang A — Konsolidierungs-Notizen
-
-### A.1 Korrigierte Transkriptionsfehler
-Die folgenden Stellen wurden als Transkriptionsfehler interpretiert und im Text korrigiert (Markierung ⟦…⟧). **Bitte gegenprüfen:**
-
-| Im Roh-Intake | Konsolidiert als | Begründung |
-|---|---|---|
-| „Pabla" (mehrfach) | **Publer** | Das im Code real integrierte Scheduling-/Publishing-Tool heißt Publer. |
-| „Sanos-Anwendung" | **SaaS-Anwendung** | Kontext: „wie machen das andere … sechs Millionen Anwendungen" → Software-as-a-Service. |
-| „Wenn WDF gebraucht wird, wird PDF aus dem Word erzeugt" | **PDF** | Tippfehler/Verhörer; Kontext nennt unmittelbar PDF. |
-| „ihren Umverbandsrundschreiben" | **Verbandsrundschreiben** | „Um-" als Transkriptionsartefakt; ZDB = Verband, Rundschreiben an Verbandsmitglieder. |
-| „Ja man dann mäßig läuft das" | **„mandantenmäßig läuft das"** | Garbled; Kontext ist die Mandanten-Diskussion (Möglichkeit A). |
-
-### A.2 Interpretierende Annahmen (kein wörtlicher Fehler, aber gedeutet)
-- „dafür haben wir unsere Agenten" → als Aussage gewertet, dass die Umsetzung **agentengestützt** erfolgt und der Umbauaufwand deshalb als unkritisch gilt (§7.1).
-- „dieser geheime Redakteurs-Prompt" → als **zentraler, geheimer System-Prompt** über allen Kanal-Prompts interpretiert (§4).
-
-### A.3 Bewusst nicht weggekürzt
-Folgende „weichen" Aussagen wurden absichtlich erhalten, weil sie Haltung/Richtung transportieren: die Unsicherheit über UI-Konfigurierbarkeit der Kanäle (§2), das Hin-und-Her zur Markdown-Reduktion mit finaler Landung auf Markdown+Text (§3.3), die Abneigung gegen Word („macht Stress", §6.5), und der Hinweis, dass die ZDB-Variante geforkt und dadurch weniger ausgereift ist (§3.3).

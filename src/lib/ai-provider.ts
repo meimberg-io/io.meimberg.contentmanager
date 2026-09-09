@@ -49,8 +49,85 @@ export const DEFAULT_MODEL = 'gpt-5.6-terra'
  * non-streaming plain `fetch`, so the ceiling is bounded by request timeouts
  * rather than by the models: 16000 is the largest value that comfortably
  * completes in one HTTP request.
+ *
+ * Note that on models which think by default (Claude Opus 5, Sonnet 5,
+ * Fable 5.1, and the OpenAI reasoning models) the thinking/reasoning tokens
+ * are drawn from this same budget, so a long article has less room than the
+ * number suggests.  Running out is no longer silent — the extract helpers
+ * below throw when the budget is exhausted before any text is emitted.
  */
 const MAX_OUTPUT_TOKENS = 16000
+
+/**
+ * Extract the assistant text from an OpenAI chat-completions response.
+ *
+ * Throws rather than returning '' on an empty completion: an empty string
+ * travels silently all the way into the editor, where `markdownToProsemirror`
+ * turns it into a single blank block that looks like a successful generation.
+ */
+export function extractOpenAIText(data: any): string {
+  const choice = data?.choices?.[0]
+  const content = choice?.message?.content
+  const text =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content.filter((p: any) => p?.type === 'text').map((p: any) => p.text).join('')
+        : ''
+
+  if (text) return text
+
+  console.error('[OpenAI] Empty completion. Full response:', JSON.stringify(data, null, 2))
+
+  if (choice?.finish_reason === 'length') {
+    throw new Error(
+      `OpenAI hit the ${MAX_OUTPUT_TOKENS} token limit before producing any text. ` +
+      `On reasoning models the reasoning tokens count toward this limit.`
+    )
+  }
+  if (choice?.finish_reason === 'content_filter') {
+    throw new Error('OpenAI blocked the response (content filter)')
+  }
+  throw new Error(`OpenAI returned an empty response (finish_reason: ${choice?.finish_reason ?? 'unknown'})`)
+}
+
+/**
+ * Extract the assistant text from an Anthropic messages response.
+ *
+ * The response is a list of content blocks, and the text is NOT reliably the
+ * first one: on models with extended thinking enabled by default (Claude Opus 5,
+ * Sonnet 5, Fable 5.1) the first block is a `thinking` block with no `.text`,
+ * so reading `content[0].text` silently yields '' and the generated article is
+ * thrown away.  Concatenate every text block instead — citations also split a
+ * single answer across several of them.
+ */
+export function extractAnthropicText(data: any): string {
+  const blocks: any[] = Array.isArray(data?.content) ? data.content : []
+  const text = blocks
+    .filter((b) => b?.type === 'text')
+    .map((b) => b.text ?? '')
+    .join('')
+
+  if (text) return text
+
+  console.error('[Anthropic] No text block in response. Full response:', JSON.stringify(data, null, 2))
+
+  if (data?.stop_reason === 'refusal') {
+    throw new Error(
+      `Anthropic declined the request (${data?.stop_details?.category ?? 'unknown'})`
+    )
+  }
+  if (data?.stop_reason === 'max_tokens') {
+    throw new Error(
+      `Anthropic hit the ${MAX_OUTPUT_TOKENS} token limit before producing any text. ` +
+      `Thinking tokens count toward this limit.`
+    )
+  }
+  throw new Error(
+    `Anthropic returned no text block (stop_reason: ${data?.stop_reason ?? 'unknown'}, ` +
+    `blocks: ${blocks.map((b) => b?.type).join(', ') || 'none'})`
+  )
+}
 
 // API Keys from environment
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
@@ -164,7 +241,7 @@ async function callOpenAI(prompt: string, imageUrl: string | undefined, model: s
   }
 
   const data = await response.json()
-  return data.choices[0]?.message?.content || ''
+  return extractOpenAIText(data)
 }
 
 /**
@@ -226,7 +303,7 @@ async function callAnthropic(prompt: string, imageUrl: string | undefined, model
   }
 
   const data = await response.json()
-  return data.content[0]?.text || ''
+  return extractAnthropicText(data)
 }
 
 /**
