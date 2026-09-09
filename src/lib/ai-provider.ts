@@ -2,9 +2,12 @@
  * AI Provider Abstraction
  * 
  * Unified interface for multiple AI providers with vision capabilities:
- * - OpenAI (GPT-5.5, GPT-5.4 Mini)
- * - Anthropic Claude (Claude Opus 4.8, Claude Sonnet 4.6, Claude Haiku 4.5)
- * - Google AI (Gemini 3.5 Flash, Gemini 2.5 Pro, Gemini 3.1 Flash Lite)
+ * - OpenAI (GPT-6 Astra, GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna)
+ * - Anthropic Claude (Claude Opus 5, Claude Fable 5.1, Claude Sonnet 5, Claude Haiku 4.5)
+ * - Google AI (Gemini 3.1 Pro, Gemini 3.8 Flash, Gemini 3.5 Flash-Lite)
+ *
+ * Updated 2026-09-09 from official model docs (platform.openai.com,
+ * platform.claude.com, ai.google.dev) — see Slack thread for source pull.
  */
 
 export type AIProvider = 'openai' | 'anthropic' | 'google'
@@ -19,19 +22,22 @@ export interface AIModel {
 // Available models with vision support
 export const AI_MODELS: AIModel[] = [
   // OpenAI
-  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', supportsVision: true },
-  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'openai', supportsVision: true },
+  { id: 'gpt-6-astra', name: 'GPT-6 Astra', provider: 'openai', supportsVision: true },
+  { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', provider: 'openai', supportsVision: true },
+  { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', provider: 'openai', supportsVision: true },
+  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', provider: 'openai', supportsVision: true },
   // Anthropic Claude
-  { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', supportsVision: true },
-  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'anthropic', supportsVision: true },
+  { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic', supportsVision: true },
+  { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', supportsVision: true },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', supportsVision: true },
   { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', provider: 'anthropic', supportsVision: true },
-  // Google AI (Gemini) - stable GA ids (Pro tier still latest at 2.5)
-  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'google', supportsVision: true },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'google', supportsVision: true },
-  { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', provider: 'google', supportsVision: true },
+  // Google AI (Gemini)
+  { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', provider: 'google', supportsVision: true },
+  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'google', supportsVision: true },
+  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite', provider: 'google', supportsVision: true },
 ]
 
-export const DEFAULT_MODEL = 'gpt-5.5'
+export const DEFAULT_MODEL = 'gpt-5.6-terra'
 
 /**
  * Hard cap on generated tokens, applied to every provider.
