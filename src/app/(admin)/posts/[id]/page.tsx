@@ -44,6 +44,7 @@ import {
   Pencil,
   RotateCcw,
   Wand2,
+  Upload,
 } from "lucide-react";
 import {
   Dialog,
@@ -126,6 +127,8 @@ export default function PostDetailPage() {
   // Header image generation
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<{ assetId: number; url: string } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [headerPictureUrl, setHeaderPictureUrl] = useState<string | undefined>(undefined);
   const [generatingImage, setGeneratingImage] = useState<"prompt" | "image" | null>(null);
 
@@ -180,8 +183,8 @@ export default function PostDetailPage() {
       bodyBlocks,
       editorKind,
     });
-    return current !== savedSnapshot || generatedImageBase64 !== null;
-  }, [form, slugValue, bodyBlocks, editorKind, generatedImageBase64, savedSnapshot]);
+    return current !== savedSnapshot || generatedImageBase64 !== null || uploadedImage !== null;
+  }, [form, slugValue, bodyBlocks, editorKind, generatedImageBase64, uploadedImage, savedSnapshot]);
 
   // Load post data
   const loadPost = useCallback(async () => {
@@ -229,6 +232,7 @@ export default function PostDetailPage() {
       setBodyBlocks(transformed.body || []);
       setHeaderPictureUrl(transformed.headerpicture);
       setGeneratedImageBase64(null); // Clear any preview on reload
+      setUploadedImage(null);
       if (transformed.aiHint) setTransientPromptHint(transformed.aiHint);
       if (transformed.imagePrompt) setImagePrompt(transformed.imagePrompt);
 
@@ -332,9 +336,16 @@ export default function PostDetailPage() {
     setSaving(true);
 
     try {
-      // If there's a generated image, upload it first
+      // A pending header picture (uploaded file or generated image) becomes the story asset
       let headerpictureUpdate: any = undefined;
-      if (generatedImageBase64) {
+      if (uploadedImage) {
+        headerpictureUpdate = {
+          id: uploadedImage.assetId,
+          filename: uploadedImage.url,
+          alt: form.pagetitle || post.slug,
+          fieldtype: 'asset',
+        };
+      } else if (generatedImageBase64) {
         const uploadRes = await fetch("/api/ai/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -700,6 +711,37 @@ export default function PostDetailPage() {
 
   // ─── Header Image Generation ────────────────────────────────
 
+  const handleUploadHeaderImage = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      setUploadingImage(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/posts/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Upload failed");
+
+        setGeneratedImageBase64(null); // an uploaded file replaces a pending generated image
+        setUploadedImage({ assetId: data.id, url: data.publicUrl });
+        toast({ title: "Header picture uploaded", description: "It will be attached to the post when you save." });
+      } catch (error: any) {
+        toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+      } finally {
+        setUploadingImage(false);
+      }
+    };
+    input.click();
+  };
+
   const handleGenerateImagePrompt = async () => {
     if (!post) return;
     setGeneratingImage("prompt");
@@ -769,6 +811,7 @@ export default function PostDetailPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Image generation failed");
       setGeneratedImageBase64(data.base64);
+      setUploadedImage(null);
       toast({ title: "Header image generated", description: "Image will be uploaded when you save." });
     } catch (error: any) {
       toast({ title: "Generation failed", description: error.message, variant: "destructive" });
@@ -848,99 +891,123 @@ export default function PostDetailPage() {
         <div className="animate-fade-in" style={{ animationDelay: "50ms" }}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-display text-lg font-semibold">Header Picture</h2>
-            {hasSource && (
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={async () => {
-                    setImagePrompt("");
-                    setGeneratedImageBase64(null);
-                    // Regenerate prompt, then immediately generate the image
-                    setGeneratingImage("prompt");
-                    try {
-                      const promptRes = await fetch("/api/ai/generate-image", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          action: "prompt",
-                          sourceRaw: post?.sourceRaw,
-                          sourceSummarized: post?.sourceSummarized,
-                          hint: transientPromptHint || undefined,
-                          modelId: transientModel || undefined,
-                          contentType: storyKind.contentType,
-                        }),
-                      });
-                      const promptData = await promptRes.json();
-                      if (!promptRes.ok) throw new Error(promptData.error || "Failed to generate prompt");
-                      setImagePrompt(promptData.imagePrompt);
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={handleUploadHeaderImage}
+                disabled={uploadingImage || !!generatingImage}
+              >
+                {uploadingImage ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5" />
+                )}
+                Upload Picture
+              </Button>
+              {hasSource && (
+                <>
+                  <Button
+                    size="sm"
+                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={async () => {
+                      setImagePrompt("");
+                      setGeneratedImageBase64(null);
+                      setUploadedImage(null);
+                      // Regenerate prompt, then immediately generate the image
+                      setGeneratingImage("prompt");
+                      try {
+                        const promptRes = await fetch("/api/ai/generate-image", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            action: "prompt",
+                            sourceRaw: post?.sourceRaw,
+                            sourceSummarized: post?.sourceSummarized,
+                            hint: transientPromptHint || undefined,
+                            modelId: transientModel || undefined,
+                            contentType: storyKind.contentType,
+                          }),
+                        });
+                        const promptData = await promptRes.json();
+                        if (!promptRes.ok) throw new Error(promptData.error || "Failed to generate prompt");
+                        setImagePrompt(promptData.imagePrompt);
 
-                      // Now generate the image with the new prompt
-                      setGeneratingImage("image");
-                      const imgRes = await fetch("/api/ai/generate-image", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "image", dallePrompt: promptData.imagePrompt }),
-                      });
-                      const imgData = await imgRes.json();
-                      if (!imgRes.ok) throw new Error(imgData.error || "Image generation failed");
-                      setGeneratedImageBase64(imgData.base64);
-                      toast({ title: "Header image regenerated", description: "Image will be uploaded when you save." });
-                    } catch (error: any) {
-                      toast({ title: "Generation failed", description: error.message, variant: "destructive" });
-                    } finally {
-                      setGeneratingImage(null);
-                    }
-                  }}
-                  disabled={!!generatingImage}
-                >
-                  {generatingImage === "prompt" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-3.5 w-3.5" />
-                  )}
-                  Start Over
-                </Button>
-                <Button
-                  size="sm"
-                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={handleGenerateImage}
-                  disabled={!!generatingImage}
-                >
-                  {generatingImage === "image" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <ImageIcon className="h-3.5 w-3.5" />
-                  )}
-                  Generate Picture
-                </Button>
-              </div>
-            )}
+                        // Now generate the image with the new prompt
+                        setGeneratingImage("image");
+                        const imgRes = await fetch("/api/ai/generate-image", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "image", dallePrompt: promptData.imagePrompt }),
+                        });
+                        const imgData = await imgRes.json();
+                        if (!imgRes.ok) throw new Error(imgData.error || "Image generation failed");
+                        setGeneratedImageBase64(imgData.base64);
+                        setUploadedImage(null);
+                        toast({ title: "Header image regenerated", description: "Image will be uploaded when you save." });
+                      } catch (error: any) {
+                        toast({ title: "Generation failed", description: error.message, variant: "destructive" });
+                      } finally {
+                        setGeneratingImage(null);
+                      }
+                    }}
+                    disabled={!!generatingImage}
+                  >
+                    {generatingImage === "prompt" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    Start Over
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={handleGenerateImage}
+                    disabled={!!generatingImage}
+                  >
+                    {generatingImage === "image" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <ImageIcon className="h-3.5 w-3.5" />
+                    )}
+                    Generate Picture
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Image preview */}
-          {(generatedImageBase64 || headerPictureUrl) && (
+          {/* Image preview — a pending upload or generation wins over the saved asset */}
+          {(uploadedImage || generatedImageBase64 || headerPictureUrl) && (
             <div className="relative rounded-lg overflow-hidden border border-border/50 mb-3" style={{ aspectRatio: "4/1" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={generatedImageBase64 ? `data:image/png;base64,${generatedImageBase64}` : headerPictureUrl}
+                src={
+                  uploadedImage
+                    ? uploadedImage.url
+                    : generatedImageBase64
+                      ? `data:image/png;base64,${generatedImageBase64}`
+                      : headerPictureUrl
+                }
                 alt="Header picture"
                 className="w-full h-full object-cover object-center absolute inset-0"
               />
-              {generatedImageBase64 && (
+              {(uploadedImage || generatedImageBase64) && (
                 <div className="absolute top-2 right-2">
                   <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px]">
-                    Unsaved — will upload on save
+                    {uploadedImage ? "Unsaved — will be attached on save" : "Unsaved — will upload on save"}
                   </Badge>
                 </div>
               )}
             </div>
           )}
 
-          {!generatedImageBase64 && !headerPictureUrl && (
+          {!uploadedImage && !generatedImageBase64 && !headerPictureUrl && (
             <div className="rounded-lg border border-dashed border-border/50 bg-secondary/10 p-8 text-center text-sm text-muted-foreground mb-3">
               <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              No header picture yet. Generate one using the image prompt in AI Settings.
+              No header picture yet. Upload a file, or generate one using the image prompt in AI Settings.
             </div>
           )}
         </div>
