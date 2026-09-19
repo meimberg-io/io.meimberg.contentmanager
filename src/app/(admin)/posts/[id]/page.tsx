@@ -45,6 +45,7 @@ import {
   RotateCcw,
   Wand2,
   Upload,
+  Plus,
 } from "lucide-react";
 import {
   Dialog,
@@ -132,9 +133,10 @@ export default function PostDetailPage() {
   const [headerPictureUrl, setHeaderPictureUrl] = useState<string | undefined>(undefined);
   const [generatingImage, setGeneratingImage] = useState<"prompt" | "image" | null>(null);
 
-  // Source edit dialog
-  const [editSummaryOpen, setEditSummaryOpen] = useState(false);
-  const [editSummaryText, setEditSummaryText] = useState("");
+  // Source / briefing edit dialog
+  const [editSourceOpen, setEditSourceOpen] = useState(false);
+  const [editSourceField, setEditSourceField] = useState<"raw" | "summarized">("raw");
+  const [editSourceText, setEditSourceText] = useState("");
 
   // Generate All progress
   const [generateAllProgress, setGenerateAllProgress] = useState<{ current: number; total: number; label: string } | null>(null);
@@ -401,6 +403,42 @@ export default function PostDetailPage() {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openSourceEditor = (field: "raw" | "summarized") => {
+    if (!post) return;
+    setEditSourceField(field);
+    setEditSourceText(field === "raw" ? (post.sourceRaw || "") : (post.sourceSummarized || ""));
+    setEditSourceOpen(true);
+  };
+
+  const handleSaveSource = async () => {
+    if (!post) return;
+    setSaving(true);
+    try {
+      const key = editSourceField === "raw" ? "cm_source_raw" : "cm_source_summarized";
+      const response = await fetch("/api/posts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: post.storyblokId,
+          [key]: editSourceText,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || "Failed to save briefing");
+      }
+      setEditSourceOpen(false);
+      toast({
+        title: editSourceField === "raw" ? "Briefing updated" : "Summary updated",
+      });
+      await loadPost();
+    } catch (error: any) {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -1586,66 +1624,84 @@ export default function PostDetailPage() {
           </div>
         </Collapsible>
 
-        {/* 4. Source Material */}
-        {hasSource && (
-          <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3 animate-fade-in">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-sm">Source Material</span>
-              <Badge variant="secondary" className="text-[10px]">
-                Read-only
-              </Badge>
+        {/* 4. Source Material — always visible so a briefing can be added later */}
+        <div className="rounded-lg border border-border/50 bg-card p-4 space-y-3 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-sm">Source Material</span>
+          </div>
+
+          {!hasSource && (
+            <div className="rounded-lg border border-dashed border-border/50 bg-secondary/10 p-6 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">
+                No briefing yet. Add source material to generate images and AI fields.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => openSourceEditor("raw")}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add briefing
+              </Button>
             </div>
+          )}
 
-            {post.sourceSummarized && (
-              <Collapsible defaultOpen>
-                <div className="flex items-center justify-between mb-1">
-                  <CollapsibleTrigger className="flex items-center gap-1 text-left">
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
-                    <Label className="text-xs text-muted-foreground cursor-pointer">
-                      Summary
-                    </Label>
-                  </CollapsibleTrigger>
-                  <button
-                    className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                    onClick={() => {
-                      setEditSummaryText(post.sourceSummarized || "");
-                      setEditSummaryOpen(true);
-                    }}
-                    title="Edit summary"
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </button>
+          {post.sourceSummarized && (
+            <Collapsible defaultOpen>
+              <div className="flex items-center justify-between mb-1">
+                <CollapsibleTrigger className="flex items-center gap-1 text-left">
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
+                  <Label className="text-xs text-muted-foreground cursor-pointer">
+                    Summary
+                  </Label>
+                </CollapsibleTrigger>
+                <button
+                  className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  onClick={() => openSourceEditor("summarized")}
+                  title="Edit summary"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              </div>
+              <CollapsibleContent>
+                <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-64 overflow-y-auto mt-2">
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                    {fixTables(post.sourceSummarized)}
+                  </ReactMarkdown>
                 </div>
-                <CollapsibleContent>
-                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-64 overflow-y-auto mt-2">
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                      {fixTables(post.sourceSummarized)}
-                    </ReactMarkdown>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
-            {post.sourceRaw && (
-              <Collapsible>
-                <CollapsibleTrigger className="flex items-center gap-1 w-full text-left mb-1">
+          {post.sourceRaw && (
+            <Collapsible defaultOpen={!post.sourceSummarized}>
+              <div className="flex items-center justify-between mb-1">
+                <CollapsibleTrigger className="flex items-center gap-1 text-left">
                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
                   <Label className="text-xs text-muted-foreground cursor-pointer">
                     Raw Transcription
                   </Label>
                 </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-48 overflow-y-auto mt-2">
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                      {fixTables(post.sourceRaw)}
-                    </ReactMarkdown>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-          </div>
-        )}
+                <button
+                  className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  onClick={() => openSourceEditor("raw")}
+                  title="Edit briefing"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              </div>
+              <CollapsibleContent>
+                <div className="source-markdown bg-secondary/30 rounded-md p-3 text-xs leading-relaxed max-h-48 overflow-y-auto mt-2">
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                    {fixTables(post.sourceRaw)}
+                  </ReactMarkdown>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+        </div>
       </div>
 
       {/* Optimize Text Dialog */}
@@ -1692,43 +1748,33 @@ export default function PostDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Summary Dialog */}
-      <Dialog open={editSummaryOpen} onOpenChange={setEditSummaryOpen}>
+      {/* Add / edit briefing or summary */}
+      <Dialog open={editSourceOpen} onOpenChange={setEditSourceOpen}>
         <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Edit Summary</DialogTitle>
+            <DialogTitle>
+              {editSourceField === "raw"
+                ? (post.sourceRaw ? "Edit briefing" : "Add briefing")
+                : (post.sourceSummarized ? "Edit Summary" : "Add Summary")}
+            </DialogTitle>
           </DialogHeader>
           <Textarea
-            value={editSummaryText}
-            onChange={(e) => setEditSummaryText(e.target.value)}
+            value={editSourceText}
+            onChange={(e) => setEditSourceText(e.target.value)}
+            placeholder={
+              editSourceField === "raw"
+                ? "Paste the briefing or source material…"
+                : "Summarized source material…"
+            }
             className="flex-1 min-h-[500px] font-mono text-xs resize-none"
+            autoFocus
           />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditSummaryOpen(false)}>
+            <Button variant="ghost" onClick={() => setEditSourceOpen(false)}>
               Cancel
             </Button>
             <Button
-              onClick={async () => {
-                if (!post) return;
-                setSaving(true);
-                try {
-                  await fetch("/api/posts", {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      id: post.storyblokId,
-                      cm_source_summarized: editSummaryText,
-                    }),
-                  });
-                  setEditSummaryOpen(false);
-                  toast({ title: "Summary updated" });
-                  await loadPost();
-                } catch (error: any) {
-                  toast({ title: "Failed", description: error.message, variant: "destructive" });
-                } finally {
-                  setSaving(false);
-                }
-              }}
+              onClick={handleSaveSource}
               disabled={saving}
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
